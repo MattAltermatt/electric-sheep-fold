@@ -15,6 +15,9 @@ venv/
 # Corpus data (large; lives in a separate repo if ever published — see ROADMAP Phase 4)
 /corpus/
 
+# Session-local scratch (handoff notes, daily logs) — never commit
+/.remember/
+
 # IDE / OS
 .vscode/
 .idea/
