@@ -39,11 +39,24 @@ chunked zips are the natural distribution unit.
 
 Run `--gen 249` (etc.) as ES rolls over. Same script, no changes needed.
 
+### Phase 7 — dead-gen archive preservation 🪦 *(in progress 2026-05-20)*
+
+One-shot preservation of dead generations via `scripts/scrape_archive_gen.py`
+(throwaway). For each gen with archived content on
+`electricsheep.com/archives`: enumerate sheep ids by walking `time/N.html`
+pages, fetch each via the `spex` endpoint, write canonical-named `.flam3`
+files, then `electric-sheep-fold import` + `seal --chunk` per chunk. Order: smallest
+gens first (242 → 243 → 245 → 191 → 244 → 198 → 247-archived → 248-archived
+→ 165 → 169 → 23/old/very-old). After all preserved, the scripts can be
+deleted; the live tool stays focused on 247/248.
+
 ## 🚧 Todos (next session)
 
-- Drive the first chunk seals — `electric-sheep-fold fetch 7000..9000` then
-  `fetch 13000..20000` to complete chunks 0 + 1 (overnight at 20s cadence;
-  auto-seal triggers when ranges complete).
+- **Live track** — continue `electric-sheep-fold fetch-all --gen 248` to fill the
+  remaining ~37k slots (sticky-404 + sealed chunks make this resumable).
+  Then `--gen 247` for what v3d0 still serves live.
+- **Preservation track** — finish gen 242 scrape (in flight at
+  `/tmp/scrape-test-242`), import, force-seal. Then 243, 245, 191, 244, 198.
 - Phase 3 (v0.3 pyr3-facing index) — start the design round with the
   BACKLOG question about whether the aggregator scans working dirs or
   only sealed zips. Pyr3's actual query patterns should shape the schema.

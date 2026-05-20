@@ -15,8 +15,22 @@
 
 These must NOT be violated without a deliberate spec update:
 
-- **Politeness:** default cadence is 20s, sequential only, identifiable User-Agent.
-  Parallelism is forbidden — at this cadence it buys nothing and risks server load.
+- **Politeness:** two cadences by endpoint type:
+  - **Live sheep server (`v3d0.sheepserver.net/gen/{247,248}/...`):** 20s ±5s
+    jitter, sequential, identifiable User-Agent. The live server generates
+    fresh genomes; treat it as expensive and rare.
+  - **Static archive (`electricsheep.com/archives/...`):** 2s ±1s jitter,
+    sequential. Archive is static HTML/spex content; faster cadence is fine.
+  - Parallelism across either endpoint is forbidden. Same operator (Scott
+    Draves), so the two cadences also imply *never both at once* — finish one
+    long-running fetch before starting the other.
+- **Live-vs-dead gen scope:** the live tool (`electric-sheep-fold`) is geared to gens
+  247 + 248 via v3d0. **Dead gens** (165, 169, 191, 198, 242, 243, 244, 245,
+  23, "old", "very-old") are preserved by **throwaway scripts** under
+  `scripts/` that scrape `electricsheep.com/archives` via `time/` enumeration
+  + `spex` fetch. Output feeds `electric-sheep-fold import` → force-seal. The scripts
+  exist only to backfill the immutable past; once each gen is preserved,
+  they can be deleted.
 - **Sticky 404s:** once a sheep_id is in `corpus/{gen}/missing.txt`, we never
   re-probe it. ES numbering is append-only; gaps stay gaps. Re-probing wastes our
   time AND the server's.
@@ -45,5 +59,7 @@ These must NOT be violated without a deliberate spec update:
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network
 - `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.
+- `scripts/` — throwaway preservation scripts for dead gens (see
+  `scrape_archive_gen.py`). Not part of the live tool's contract.
 - `docs/superpowers/specs/` — design specs
 - `docs/superpowers/plans/` — implementation plans

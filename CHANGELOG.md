@@ -1,5 +1,19 @@
 # 📝 Changelog
 
+## Unreleased — 2026-05-20 (live)
+
+Dead-gen archive preservation (Phase 7 — one-shot, throwaway).
+
+- New: `scripts/scrape_archive_gen.py` — throwaway scraper for any dead gen
+  on `electricsheep.com/archives`. Walks `time/N.html` to enumerate sheep
+  ids, fetches each via the `spex` endpoint, writes canonical-named
+  `.flam3` files. Resumable; polite 2s ±1s cadence (static archive content).
+- CLAUDE.md: dual politeness invariant — 20s for v3d0 (live), 2s for
+  electricsheep.com archive (static).
+- Imported local archives — gen 244 (21,051 files into 9 working chunks) +
+  gen 245 (146 files into 1 working chunk). Force-sealing deferred until
+  archive scrape merges with local content (eb19/spex may add ids).
+
 ## v0.2.0 — 2026-05-20
 
 Storage refactor + ergonomics.

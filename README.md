@@ -18,6 +18,15 @@ electric-sheep-fold import ~/Downloads/old    # import existing local .flam3s
 electric-sheep-fold status                    # show per-chunk state breakdown
 ```
 
+For **dead generations** (165, 191, 198, 242, 243, 244, 245, etc.) use the
+throwaway preservation script (Phase 7):
+
+```sh
+python scripts/scrape_archive_gen.py --gen 242 --out /tmp/scrape-242
+electric-sheep-fold import /tmp/scrape-242
+electric-sheep-fold seal --chunk 00000-09999 --gen 242   # force-seal each chunk
+```
+
 ## What it does
 
 Walks a half-open `[START, END)` range of sheep IDs in generation 248 (or
@@ -25,6 +34,10 @@ Walks a half-open `[START, END)` range of sheep IDs in generation 248 (or
 in the local `corpus/` directory, at a polite 20-second cadence. Empty sheep
 dirs (HTTP 404s) are recorded once in `corpus/248/missing.txt` and never
 re-probed.
+
+For dead gens the throwaway scraper hits `electricsheep.com/archives`
+(static content, faster 2s cadence) via `time/N.html` enumeration + the
+per-sheep `spex` endpoint. Output feeds the same `import` flow.
 
 Storage is per-generation, chunked into 10k id-range `.zip` bundles
 (`corpus/248/00000-09999.zip` etc.), with a per-chunk `MANIFEST.csv` inside.
