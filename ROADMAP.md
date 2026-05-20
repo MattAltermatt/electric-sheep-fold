@@ -10,10 +10,12 @@
 Bootstrapped the tool: package + docs + four-module architecture (`layout`,
 `manifest`, `fetch`, `cli`) + 52 tests + real-server smoke test.
 
-### Phase 2 — v0.2 chunked-zip storage + ergonomics 🛠️ *(in progress)*
+### Phase 2 — v0.2 chunked-zip storage + ergonomics ✅ *(shipped 2026-05-20)*
 
-Storage refactor (chunked `.zip` at 10k id-range) + per-chunk MANIFEST.csv seam
-for v0.3 + auto-fetch + import. Spec:
+Storage refactor: per-thousand bucket dirs → sealed-immutable 10k id-range
+`.zip` chunks with per-chunk `MANIFEST.csv` seam for v0.3 + auto-fetch +
+import + automatic v0.1→v0.2 migration. Eight modules, 116 tests, real-server
+smoke confirmed migration of 2926 v0.1 files. Spec:
 [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md).
 
 ### Phase 3 — v0.3 pyr3-facing index / search 🔮
@@ -37,7 +39,11 @@ chunked zips are the natural distribution unit.
 
 Run `--gen 249` (etc.) as ES rolls over. Same script, no changes needed.
 
-## 🚧 Todos (current phase)
+## 🚧 Todos (next session)
 
-- Execute the v0.2 plan
-  ([`docs/superpowers/plans/2026-05-20-electric-sheep-fold-v0.2.md`](docs/superpowers/plans/2026-05-20-electric-sheep-fold-v0.2.md))
+- Drive the first chunk seals — `electric-sheep-fold fetch 7000..9000` then
+  `fetch 13000..20000` to complete chunks 0 + 1 (overnight at 20s cadence;
+  auto-seal triggers when ranges complete).
+- Phase 3 (v0.3 pyr3-facing index) — start the design round with the
+  BACKLOG question about whether the aggregator scans working dirs or
+  only sealed zips. Pyr3's actual query patterns should shape the schema.
