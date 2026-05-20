@@ -32,6 +32,15 @@ The live ES server (v3d0, lighttpd 1.4.33) is volunteer infrastructure preservin
 - **Identifiable User-Agent** that names the project and links the repo, so server
   admins can reach us if our load is ever a problem.
 
+## What v0.2 changes
+
+v0.1 stored each `.flam3` as a loose file under per-thousand bucket dirs. v0.2
+chunks per generation into sealed-immutable 10k id-range `.zip` bundles, with a
+per-chunk `MANIFEST.csv` that captures the structural metadata (xform_count,
+variations, designer nick) needed by the future pyr3-facing index. New CLI
+verbs: `fetch-all` (entire gen, resumable), `import` (bulk-ingest existing
+local flames). The v0.1 → v0.2 migration is automatic on first run.
+
 ## License lineage
 
 electric-sheep-fold (the tool) is GPL-3.0-or-later, matching pyr3 and the upstream flam3

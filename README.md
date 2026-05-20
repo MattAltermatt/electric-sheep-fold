@@ -13,19 +13,23 @@ uv pip install -e ".[dev]"
 
 ```sh
 electric-sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
-electric-sheep-fold status                    # show what's downloaded vs missing
+electric-sheep-fold fetch-all                 # download entire gen 248 (resumable)
+electric-sheep-fold import ~/Downloads/old    # import existing local .flam3s
+electric-sheep-fold status                    # show per-chunk state breakdown
 ```
 
 ## What it does
 
-Walks a half-open `[START, END)` range of sheep IDs in generation 248 (or `--gen N`)
-on the live ES v3d0 server, downloading any `.flam3` files that aren't already in
-the local `corpus/` directory, at a polite 20-second cadence (configurable). Empty
-sheep dirs (HTTP 404s) are recorded once in `corpus/248/missing.txt` and never
+Walks a half-open `[START, END)` range of sheep IDs in generation 248 (or
+`--gen N`) on the live ES v3d0 server, downloading any `.flam3` files not yet
+in the local `corpus/` directory, at a polite 20-second cadence. Empty sheep
+dirs (HTTP 404s) are recorded once in `corpus/248/missing.txt` and never
 re-probed.
 
-The local layout groups files by thousand under `corpus/248/00xxx/` through
-`corpus/248/40xxx/` — see [`VISION.md`](VISION.md) for why.
+Storage is per-generation, chunked into 10k id-range `.zip` bundles
+(`corpus/248/00000-09999.zip` etc.), with a per-chunk `MANIFEST.csv` inside.
+Bundles open in macOS Finder / Windows Explorer / Linux file managers
+out-of-the-box — no extra tool needed.
 
 ## Docs
 

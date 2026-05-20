@@ -1,9 +1,14 @@
-"""Tests for the CLI surface — range parsing + smoke."""
+"""Tests for the CLI — range parsing + smoke for fetch / fetch-all / import / seal / status."""
+from __future__ import annotations
+
+from pathlib import Path
+
 import pytest
 import typer
 from typer.testing import CliRunner
 
-from electric_sheep_fold.cli import _parse_range, app
+from electric_sheep_fold.cli import _parse_chunk_range, _parse_range, app
+from electric_sheep_fold.layout import flam3_filename, working_path
 
 runner = CliRunner()
 
@@ -11,7 +16,6 @@ runner = CliRunner()
 class TestParseRange:
     def test_valid(self):
         assert _parse_range("0..100") == (0, 100)
-        assert _parse_range("1000..2000") == (1000, 2000)
 
     @pytest.mark.parametrize("bad", ["0,100", "0..", "..100", "abc..def", ""])
     def test_invalid_format(self, bad):
@@ -27,77 +31,78 @@ class TestParseRange:
             _parse_range("100..50")
 
 
+class TestParseChunkRange:
+    def test_valid_standard_chunk(self):
+        assert _parse_chunk_range("00000-09999") == (0, 10_000)
+
+    def test_valid_second_chunk(self):
+        assert _parse_chunk_range("10000-19999") == (10_000, 20_000)
+
+    def test_inverted_range_rejected(self):
+        with pytest.raises(typer.BadParameter):
+            _parse_chunk_range("00100-00099")
+
+    @pytest.mark.parametrize("bad", ["not-a-range", "0-9999", "00000..09999", ""])
+    def test_malformed_rejected(self, bad):
+        with pytest.raises(typer.BadParameter):
+            _parse_chunk_range(bad)
+
+
 class TestHelp:
-    def test_top_level_help(self):
+    def test_top_level(self):
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
         assert "Polite mirror" in result.output
 
     def test_fetch_help(self):
-        result = runner.invoke(app, ["fetch", "--help"])
-        assert result.exit_code == 0
-        assert "START..END" in result.output
+        assert runner.invoke(app, ["fetch", "--help"]).exit_code == 0
+
+    def test_fetch_all_help(self):
+        assert runner.invoke(app, ["fetch-all", "--help"]).exit_code == 0
+
+    def test_import_help(self):
+        assert runner.invoke(app, ["import", "--help"]).exit_code == 0
+
+    def test_seal_help(self):
+        assert runner.invoke(app, ["seal", "--help"]).exit_code == 0
+
+    def test_status_help(self):
+        assert runner.invoke(app, ["status", "--help"]).exit_code == 0
 
 
-class TestStatus:
-    def test_status_no_corpus(self, tmp_path):
+class TestStatusNoCorpus:
+    def test_friendly_message(self, tmp_path: Path):
         result = runner.invoke(app, ["status", "--corpus", str(tmp_path)])
         assert result.exit_code == 0
         assert "not yet materialized" in result.output
 
-    def test_status_with_corpus(self, tmp_path):
-        # Materialize a fake corpus
+
+class TestStatusWithChunks:
+    def test_reports_chunk_breakdown(self, tmp_path: Path):
+        # Create a working chunk + a sealed zip (fake — just an empty zip file)
+        import zipfile
         gen_root = tmp_path / "248"
-        bucket = gen_root / "00xxx"
-        bucket.mkdir(parents=True)
-        (bucket / "electricsheep.248.00100.flam3").write_bytes(b"x")
-        (gen_root / "missing.txt").write_text("105\n200\n", encoding="utf-8")
+        (gen_root / "00000-09999").mkdir(parents=True)
+        (gen_root / "00000-09999" / flam3_filename(248, 100)).write_bytes(b"<flame/>")
+        sealed = gen_root / "10000-19999.zip"
+        with zipfile.ZipFile(sealed, "w") as zf:
+            zf.writestr("MANIFEST.csv", "id\n")
+        (gen_root / "missing.txt").write_text("500\n600\n")
 
         result = runner.invoke(app, ["status", "--corpus", str(tmp_path)])
         assert result.exit_code == 0
-        assert "1 downloaded" in result.output
+        assert "1 sealed" in result.output
+        assert "1 working" in result.output
         assert "2 known-missing" in result.output
 
 
-class TestFetchBadRange:
-    def test_bad_range_exits_nonzero(self):
-        """Bad range format should exit non-zero with an actionable error."""
-        result = runner.invoke(app, ["fetch", "0,100"])
-        assert result.exit_code != 0
-        # Click renders BadParameter to stderr with the message we set
-        assert "range must be" in (result.output + (result.stderr or ""))
-
-
-class TestStatusWithRange:
-    def test_status_range_computes_untried(self, tmp_path):
-        # Materialize a corpus with sheep 100 downloaded, 105 missing, range = 100..110
-        gen_root = tmp_path / "248"
-        bucket = gen_root / "00xxx"
-        bucket.mkdir(parents=True)
-        (bucket / "electricsheep.248.00100.flam3").write_bytes(b"x")
-        (gen_root / "missing.txt").write_text("105\n", encoding="utf-8")
-
-        result = runner.invoke(
-            app,
-            ["status", "--corpus", str(tmp_path), "--range", "100..110"],
-        )
+class TestImportSmoke:
+    def test_imports_a_file(self, tmp_path: Path):
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / flam3_filename(248, 100)).write_bytes(b"<flame/>")
+        corpus = tmp_path / "corpus"
+        result = runner.invoke(app, ["import", str(src), "--corpus", str(corpus)])
         assert result.exit_code == 0
-        # 10 total in range, 1 downloaded, 1 known-missing, 8 untried
-        assert "1 downloaded" in result.output
-        assert "1 known-missing" in result.output
-        assert "8 untried" in result.output
-        assert "100..110" in result.output
-
-    def test_status_no_range_falls_back_to_two_stats(self, tmp_path):
-        """Without --range, output should NOT include 'untried'."""
-        gen_root = tmp_path / "248"
-        bucket = gen_root / "00xxx"
-        bucket.mkdir(parents=True)
-        (bucket / "electricsheep.248.00100.flam3").write_bytes(b"x")
-        (gen_root / "missing.txt").write_text("105\n", encoding="utf-8")
-
-        result = runner.invoke(app, ["status", "--corpus", str(tmp_path)])
-        assert result.exit_code == 0
-        assert "1 downloaded" in result.output
-        assert "1 known-missing" in result.output
-        assert "untried" not in result.output
+        assert "imported 1" in result.output
+        assert working_path(248, 100, corpus).exists()

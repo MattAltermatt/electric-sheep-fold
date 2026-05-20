@@ -28,10 +28,20 @@ These must NOT be violated without a deliberate spec update:
   the ES attribution scheme — never rename, never strip, never re-encode.
 - **Tool license:** GPL-3.0-or-later (matches pyr3, matches flam3 upstream).
   Corpus data is CC per ES policy — see [`README.md`](README.md).
+- **Chunk size:** 10,000 ids per chunk; chunks named `NNNNN-NNNNN.zip`. Don't
+  change without a deliberate spec update and a migration story.
+- **Sealed-immutable:** once a chunk is sealed (`.zip` exists), its contents are
+  frozen. No append-to-zip. Re-key flow is `reseal` (backlog).
+- **Range-completion is the seal trigger:** a chunk seals when every id in
+  `[start, end)` has known status (present in working dir OR in `missing.txt`).
+- **MANIFEST.csv is the seam:** the first entry of every sealed zip carries the
+  extraction the v0.3 pyr3-facing index aggregates from. Schema in
+  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1.
 
 ## Where things live
 
-- `src/electric_sheep_fold/` — the four modules (`layout`, `manifest`, `fetch`, `cli`)
+- `src/electric_sheep_fold/` — `layout`, `manifest`, `chunks`, `extract`, `fetch`,
+  `importer`, `migration`, `cli`
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network
 - `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.

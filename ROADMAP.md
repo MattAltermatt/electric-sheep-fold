@@ -8,32 +8,36 @@
 ### Phase 1 — v0.1 ship ✅ *(shipped 2026-05-19)*
 
 Bootstrapped the tool: package + docs + four-module architecture (`layout`,
-`manifest`, `fetch`, `cli`) + 52 tests + real-server smoke test. Spec:
-[`docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md`](docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md).
-Live verification: `electric-sheep-fold fetch 100..105` → 1 downloaded + 4 recorded as
-sticky 404s, ~119s wall at the default 20s polite cadence. Idempotency confirmed
-(re-run = 0 network, 0.14s).
+`manifest`, `fetch`, `cli`) + 52 tests + real-server smoke test.
 
-### Phase 2 — `verify` subcommand 🔮
+### Phase 2 — v0.2 chunked-zip storage + ergonomics 🛠️ *(in progress)*
 
-Re-hash all corpus files; surface any local truncation or damage. Cheap (no
-network).
+Storage refactor (chunked `.zip` at 10k id-range) + per-chunk MANIFEST.csv seam
+for v0.3 + auto-fetch + import. Spec:
+[`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md).
 
-### Phase 3 — pyr3 integration 🔥
+### Phase 3 — v0.3 pyr3-facing index / search 🔮
 
-Pyr3 reads from `corpus/248/` directly as a parity-test source. The point of the
-whole exercise.
+Aggregate per-chunk MANIFEST.csv into a corpus-wide searchable index. Query
+interface: filter by xform_count, variations, has-nick, etc. Subsumes the old
+"verify subcommand" phase (sha256 in MANIFEST.csv enables verify as a query)
+and the BACKLOG `attribution.csv extractor` entry.
 
-### Phase 4 — public corpus repo (optional) 🌐
+### Phase 4 — pyr3 integration 🔥
 
-Push `corpus/` to a separate `muwamath/electric-sheep-fold-corpus` GitHub repo if there's
-demand. ~440MB worst case for full gen 248, well within plain-git limits.
+Pyr3 reads `corpus/{gen}/` (sealed zips + index) as parity-test source. The
+point of the whole exercise.
 
-### Phase 5 — additional generations 🐑
+### Phase 5 — public corpus repo (optional) 🌐
+
+Push sealed chunks to a separate `muwamath/electric-sheep-fold-corpus` GitHub repo;
+chunked zips are the natural distribution unit.
+
+### Phase 6 — additional generations 🐑
 
 Run `--gen 249` (etc.) as ES rolls over. Same script, no changes needed.
 
 ## 🚧 Todos (current phase)
 
-- Phase 2 (`verify` subcommand) — start when next session resumes, or pull from
-  Phase 3 (pyr3 integration) first if that's the bigger payoff.
+- Execute the v0.2 plan
+  ([`docs/superpowers/plans/2026-05-20-electric-sheep-fold-v0.2.md`](docs/superpowers/plans/2026-05-20-electric-sheep-fold-v0.2.md))

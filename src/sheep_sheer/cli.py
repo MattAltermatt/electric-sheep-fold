@@ -1,28 +1,32 @@
-"""Typer entrypoint for electric-sheep-fold."""
+"""Typer entrypoint for electric-sheep-fold (v0.2)."""
 from __future__ import annotations
 
 import logging
 import re
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
 
-from electric_sheep_fold.fetch import fetch_range, make_client
-from electric_sheep_fold.layout import local_path
+from electric_sheep_fold.chunks import Chunk
+from electric_sheep_fold.fetch import fetch_all, fetch_range, make_client
+from electric_sheep_fold.importer import import_dir
+from electric_sheep_fold.layout import chunk_for, remote_url, sealed_zip_path
 from electric_sheep_fold.manifest import MissingSet
 
 app = typer.Typer(
-    help="Polite mirror of Electric Sheep .flam3 genomes.",
+    help="Polite mirror of Electric Sheep .flam3 genomes (chunked .zip storage).",
     add_completion=False,
     no_args_is_help=True,
 )
 
 
 RANGE_RE = re.compile(r"^(\d+)\.\.(\d+)$")
+CHUNK_RANGE_RE = re.compile(r"^(\d{5})-(\d{5})$")
 
 
 def _parse_range(range_str: str) -> tuple[int, int]:
-    """Parse 'START..END' (half-open) → (start, end)."""
     m = RANGE_RE.match(range_str)
     if not m:
         raise typer.BadParameter(f"range must be START..END, got {range_str!r}")
@@ -34,74 +38,134 @@ def _parse_range(range_str: str) -> tuple[int, int]:
     return start, end
 
 
+def _parse_chunk_range(chunk_str: str) -> tuple[int, int]:
+    m = CHUNK_RANGE_RE.match(chunk_str)
+    if not m:
+        raise typer.BadParameter(f"chunk must be NNNNN-NNNNN, got {chunk_str!r}")
+    start = int(m.group(1))
+    end_inclusive = int(m.group(2))
+    if end_inclusive < start:
+        raise typer.BadParameter(
+            f"chunk range must have end >= start, got {chunk_str!r}"
+        )
+    return start, end_inclusive + 1
+
+
 @app.command()
 def fetch(
-    range_str: str = typer.Argument(..., metavar="START..END", help="Half-open range, e.g., 0..2000"),
-    gen: int = typer.Option(248, help="ES generation"),
-    delay: float = typer.Option(20.0, help="Seconds between requests"),
-    jitter: float = typer.Option(5.0, help="Random jitter added to delay (uniform 0..jitter)"),
-    corpus: Path = typer.Option(Path("./corpus"), help="Corpus root directory"),
+    range_str: str = typer.Argument(..., metavar="START..END"),
+    gen: int = typer.Option(248),
+    delay: float = typer.Option(20.0),
+    jitter: float = typer.Option(5.0),
+    corpus: Path = typer.Option(Path("./corpus")),
 ) -> None:
-    """Download .flam3 files for sheep[start, end) into the corpus."""
+    """Download .flam3 files for sheep[start, end) into the chunked corpus."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     start, end = _parse_range(range_str)
-
     with make_client() as client:
         stats = fetch_range(
-            gen=gen, start=start, end=end,
-            corpus_root=corpus, client=client,
-            delay=delay, jitter=jitter,
+            gen=gen, start=start, end=end, corpus_root=corpus,
+            client=client, delay=delay, jitter=jitter,
         )
-
     typer.echo(
-        f"\n{gen}: {stats.downloaded} downloaded · "
-        f"{stats.newly_missing} newly missing · "
-        f"{stats.skip_local} skip-local · "
-        f"{stats.skip_known_missing} skip-known-missing · "
-        f"{stats.transient_errors} transient errors"
+        f"\n{gen}: {stats.downloaded} downloaded · {stats.newly_missing} newly missing"
+        f" · {stats.skip_local} skip-local · {stats.skip_known_missing} skip-known-missing"
+        f" · {stats.chunks_sealed} chunks sealed · {stats.transient_errors} transient errors"
+    )
+
+
+@app.command("fetch-all")
+def fetch_all_cmd(
+    gen: int = typer.Option(248),
+    upper: int = typer.Option(50_000, help="Upper bound for sheep ids (exclusive)"),
+    delay: float = typer.Option(20.0),
+    jitter: float = typer.Option(5.0),
+    corpus: Path = typer.Option(Path("./corpus")),
+) -> None:
+    """Fetch the entire range [0, upper) for one gen. Resumable; idempotent."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    with make_client() as client:
+        stats = fetch_all(
+            gen=gen, corpus_root=corpus, client=client,
+            upper=upper, delay=delay, jitter=jitter,
+        )
+    typer.echo(
+        f"\n{gen}: {stats.downloaded} downloaded · {stats.newly_missing} newly missing"
+        f" · {stats.skip_local} skip-local · {stats.skip_known_missing} skip-known-missing"
+        f" · {stats.chunks_sealed} chunks sealed · {stats.transient_errors} transient errors"
+    )
+
+
+@app.command("import")
+def import_cmd(
+    src: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True),
+    corpus: Path = typer.Option(Path("./corpus")),
+) -> None:
+    """Recursively import existing local electricsheep.*.flam3 files."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    stats = import_dir(src, corpus)
+    typer.echo(
+        f"\nimported {stats.imported} · skipped {stats.skipped} · sealed {stats.sealed} chunks"
     )
 
 
 @app.command()
-def status(
-    gen: int = typer.Option(248, help="ES generation"),
-    corpus: Path = typer.Option(Path("./corpus"), help="Corpus root directory"),
-    range_str: str = typer.Option(
-        None,
-        "--range",
-        metavar="START..END",
-        help="Optional half-open range; if provided, output also includes 'untried' count for that range.",
-    ),
+def seal(
+    chunk: str = typer.Option(..., "--chunk", metavar="NNNNN-NNNNN", help="Chunk range, e.g. 20000-29999"),
+    gen: int = typer.Option(248),
+    corpus: Path = typer.Option(Path("./corpus")),
 ) -> None:
-    """Show corpus status: downloaded vs known-missing for the given gen.
+    """Force-seal a working chunk whose range isn't fully probed yet."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    start, end = _parse_chunk_range(chunk)
+    c = Chunk(gen=gen, start=start, end=end, corpus_root=corpus)
+    if c.status == "sealed":
+        typer.echo(f"chunk {c.range_str} already sealed")
+        raise typer.Exit(code=0)
+    if c.status == "empty":
+        typer.echo(f"chunk {c.range_str} is empty — nothing to seal")
+        raise typer.Exit(code=1)
+    missing = MissingSet(corpus / str(gen) / "missing.txt")
+    missing.load()
+    c.seal(
+        missing,
+        source_url_for=lambda sid: remote_url(gen, sid),
+        fetched_at_for=lambda sid: datetime.now(tz=timezone.utc),
+    )
+    typer.echo(f"sealed chunk {c.range_str}")
 
-    If --range is provided, also reports how many sheep in [START, END)
-    have not yet been attempted (untried = range_size - downloaded - known-missing,
-    both restricted to the range).
-    """
+
+@app.command()
+def status(
+    gen: int = typer.Option(248),
+    corpus: Path = typer.Option(Path("./corpus")),
+) -> None:
+    """Show corpus status: per-chunk state + known-missing count."""
     gen_root = corpus / str(gen)
     if not gen_root.exists():
         typer.echo(f"{gen}: corpus not yet materialized (run `electric-sheep-fold fetch` first)")
         return
 
+    sealed_zips = list(gen_root.glob("?????-?????.zip"))
+    working_dirs = [
+        p for p in gen_root.iterdir()
+        if p.is_dir() and re.match(r"^\d{5}-\d{5}$", p.name)
+    ]
     ms = MissingSet(gen_root / "missing.txt")
     ms.load()
 
-    if range_str is None:
-        downloaded = sum(1 for _ in gen_root.rglob("electricsheep.*.flam3"))
-        typer.echo(f"{gen}: {downloaded} downloaded · {len(ms)} known-missing")
-        return
+    total_sheep = 0
+    for zip_path in sealed_zips:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            total_sheep += sum(
+                1 for n in zf.namelist() if n.startswith("electricsheep.")
+            )
+    for d in working_dirs:
+        total_sheep += sum(1 for _ in d.glob("electricsheep.*.flam3"))
 
-    start, end = _parse_range(range_str)
-    downloaded_in_range = sum(
-        1 for sid in range(start, end) if local_path(gen, sid, corpus).exists()
-    )
-    known_missing_in_range = sum(1 for sid in range(start, end) if ms.contains(sid))
-    untried = (end - start) - downloaded_in_range - known_missing_in_range
     typer.echo(
-        f"{gen}: {downloaded_in_range} downloaded · "
-        f"{known_missing_in_range} known-missing · "
-        f"{untried} untried in {start}..{end}"
+        f"{gen}: {len(sealed_zips)} sealed · {len(working_dirs)} working · "
+        f"{total_sheep} sheep total · {len(ms)} known-missing"
     )
 
 
