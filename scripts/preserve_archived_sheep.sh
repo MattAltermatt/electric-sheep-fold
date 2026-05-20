@@ -10,14 +10,14 @@
 #   bash scripts/preserve_archived_sheep.sh           # all default gens
 #   bash scripts/preserve_archived_sheep.sh 242 243   # specific gens
 #
-# Output:
-#   /tmp/scrape-<gen>/electricsheep.<gen>.NNNNN.flam3   (canonical names)
-#   /tmp/scrape-<gen>/_enumerated_ids.txt               (resume cache)
-#   /tmp/scrape-<gen>/_missing_404.txt                  (404 ledger)
-#   /tmp/preserve-archived.log                          (combined log)
+# Output (repo-local; `corpus/` is gitignored):
+#   corpus/_scrape-<gen>/electricsheep.<gen>.NNNNN.flam3   (canonical names)
+#   corpus/_scrape-<gen>/_enumerated_ids.txt               (resume cache)
+#   corpus/_scrape-<gen>/_missing_404.txt                  (404 ledger)
+#   corpus/_scrape-preserve-archived.log                   (combined log)
 #
 # When done (or anytime — each gen is independent), import + force-seal:
-#   electric-sheep-fold import /tmp/scrape-242
+#   electric-sheep-fold import corpus/_scrape-242
 #   electric-sheep-fold seal --chunk 00000-09999 --gen 242
 #
 # Estimated total time @ 2s cadence:
@@ -33,15 +33,16 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
-LOG="/tmp/preserve-archived.log"
+LOG="corpus/_scrape-preserve-archived.log"
 GENS=("$@")
 if [ ${#GENS[@]} -eq 0 ]; then
   GENS=(242 243 245 191 244 198)
 fi
 
+mkdir -p corpus
 echo "[$(date '+%F %T')] preserve_archived_sheep: gens ${GENS[*]}" | tee -a "$LOG"
 for G in "${GENS[@]}"; do
-  OUT="/tmp/scrape-$G"
+  OUT="corpus/_scrape-$G"
   echo "[$(date '+%F %T')] === gen $G -> $OUT ===" | tee -a "$LOG"
   python scripts/scrape_archive_gen.py --gen "$G" --out "$OUT" 2>&1 | tee -a "$LOG"
   echo "[$(date '+%F %T')] gen $G done" | tee -a "$LOG"

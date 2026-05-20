@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-seed /tmp/scrape-<gen>/ from existing local archives so the scraper
+# Pre-seed corpus/_scrape-<gen>/ from existing local archives so the scraper
 # skips re-downloading what we already have. Uses symlinks (no copy, no
 # disk waste). For gen 247 the source files lack the canonical
 # electricsheep.247. prefix so we rename during the symlink.
@@ -16,16 +16,19 @@
 # Safe to re-run: ln -sf overwrites existing symlinks.
 
 set -u
-SRC="${1:-/Users/matt/dev/sheep}"
-echo "seeding /tmp/scrape-{244,245,247}/ from $SRC"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.." || exit 1
 
-mkdir -p /tmp/scrape-244 /tmp/scrape-245 /tmp/scrape-247
+SRC="${1:-/Users/matt/dev/sheep}"
+echo "seeding corpus/_scrape-{244,245,247}/ from $SRC"
+
+mkdir -p corpus/_scrape-244 corpus/_scrape-245 corpus/_scrape-247
 
 # 244 — canonical names, symlink straight through
 n=0
 for f in "$SRC"/244/electricsheep.244.*.flam3; do
   [ -f "$f" ] || continue
-  ln -sf "$f" /tmp/scrape-244/
+  ln -sf "$f" corpus/_scrape-244/
   n=$((n+1))
 done
 echo "  244: $n symlinks"
@@ -34,7 +37,7 @@ echo "  244: $n symlinks"
 n=0
 for f in "$SRC"/245/electricsheep.245.*.flam3; do
   [ -f "$f" ] || continue
-  ln -sf "$f" /tmp/scrape-245/
+  ln -sf "$f" corpus/_scrape-245/
   n=$((n+1))
 done
 echo "  245: $n symlinks"
@@ -44,7 +47,7 @@ n=0
 for f in "$SRC"/247/[0-9]*.flam3; do
   [ -f "$f" ] || continue
   id=$(basename "$f" .flam3)
-  ln -sf "$f" /tmp/scrape-247/electricsheep.247."${id}".flam3
+  ln -sf "$f" corpus/_scrape-247/electricsheep.247."${id}".flam3
   n=$((n+1))
 done
 echo "  247: $n symlinks"

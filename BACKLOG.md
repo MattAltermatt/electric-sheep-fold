@@ -7,7 +7,7 @@ load-bearing.
 
 | Gen | Est. sheep | Scrape time @ 2s | Status |
 |---|---|---|---|
-| 242 | ~3,584 | ~2 hr | in flight (`/tmp/scrape-test-242`) |
+| 242 | ~3,584 | ~2 hr | in flight (resumes at 476/3584 in `corpus/_scrape-242/`) |
 | 243 | ~6,080 | ~3.4 hr | queued |
 | 245 | ~12,096 | ~6.7 hr | queued (local 146 already imported) |
 | 191 | ~21,760 | ~12 hr | queued |

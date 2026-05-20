@@ -22,8 +22,8 @@ For **dead generations** (165, 191, 198, 242, 243, 244, 245, etc.) use the
 throwaway preservation script (Phase 7):
 
 ```sh
-python scripts/scrape_archive_gen.py --gen 242 --out /tmp/scrape-242
-electric-sheep-fold import /tmp/scrape-242
+python scripts/scrape_archive_gen.py --gen 242 --out corpus/_scrape-242
+electric-sheep-fold import corpus/_scrape-242
 electric-sheep-fold seal --chunk 00000-09999 --gen 242   # force-seal each chunk
 ```
 

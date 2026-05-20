@@ -11,8 +11,8 @@ can backfill historical/archived ids those don't reach.
 Output: flat directory of canonical-named files. Feed to `electric-sheep-fold import`.
 
 Usage:
-    python scripts/scrape_archive_gen.py --gen 242 --out /tmp/scrape-242
-    electric-sheep-fold import /tmp/scrape-242
+    python scripts/scrape_archive_gen.py --gen 242 --out corpus/_scrape-242
+    electric-sheep-fold import corpus/_scrape-242
 
 Resumable: re-running picks up where it left off (cached id list + skip
 existing files). Polite 20s+jitter cadence by default.

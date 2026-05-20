@@ -55,8 +55,8 @@ deleted; the live tool stays focused on 247/248.
 - **Live track** — continue `electric-sheep-fold fetch-all --gen 248` to fill the
   remaining ~37k slots (sticky-404 + sealed chunks make this resumable).
   Then `--gen 247` for what v3d0 still serves live.
-- **Preservation track** — finish gen 242 scrape (in flight at
-  `/tmp/scrape-test-242`), import, force-seal. Then 243, 245, 191, 244, 198.
+- **Preservation track** — finish gen 242 scrape (resumes at id 476/3584 in
+  `corpus/_scrape-242/`), import, force-seal. Then 243, 245, 191, 244, 198.
 - Phase 3 (v0.3 pyr3-facing index) — start the design round with the
   BACKLOG question about whether the aggregator scans working dirs or
   only sealed zips. Pyr3's actual query patterns should shape the schema.
