@@ -3,7 +3,7 @@
 ## Conventions
 
 - **Default branch:** `main`.
-- **Identity (this repo):** `muwamath <muwamath@proton.me>`. Set as `--local`,
+- **Identity (this repo):** `MattAltermatt <1435066+MattAltermatt@users.noreply.github.com>`. Set as `--local`,
   not global.
 - **Commits:** terse, no body, no `Co-Authored-By` trailer. `git log --oneline`
   should read like a story.

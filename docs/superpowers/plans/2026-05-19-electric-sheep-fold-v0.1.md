@@ -43,7 +43,7 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
 - [ ] **Step 1a: Create the feature branch.**
 
   ```bash
-  cd /Users/matt/dev/muwamath/electric-sheep-fold
+  cd /Users/matt/dev/MattAltermatt/electric-sheep-fold
   git checkout -b feature/v0.1-bootstrap
   ```
 
@@ -84,7 +84,7 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
   readme = "README.md"
   requires-python = ">=3.11"
   license = "GPL-3.0-or-later"
-  authors = [{ name = "muwamath" }]
+  authors = [{ name = "MattAltermatt" }]
   dependencies = [
       "httpx>=0.27",
       "typer>=0.12",
@@ -240,7 +240,7 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
 
   ### Phase 4 — public corpus repo (optional) 🌐
 
-  Push `corpus/` to a separate `muwamath/electric-sheep-fold-corpus` GitHub repo if there's
+  Push `corpus/` to a separate `MattAltermatt/electric-sheep-fold-corpus` GitHub repo if there's
   demand. ~440MB worst case for full gen 248, well within plain-git limits.
 
   ### Phase 5 — additional generations 🐑
@@ -303,7 +303,7 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
   ## Conventions
 
   - **Default branch:** `main`.
-  - **Identity (this repo):** `muwamath <muwamath@proton.me>`. Set as `--local`,
+  - **Identity (this repo):** `MattAltermatt <1435066+MattAltermatt@users.noreply.github.com>`. Set as `--local`,
     not global.
   - **Commits:** terse, no body, no `Co-Authored-By` trailer. `git log --oneline`
     should read like a story.
@@ -360,8 +360,8 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
 
   This directory contains a collection of fractal-flame genomes (`.flam3` files)
   downloaded from the [Electric Sheep](https://electricsheep.org) v3d0 server using
-  [electric-sheep-fold](https://github.com/muwamath/electric-sheep-fold), a companion tool to
-  [pyr3](https://github.com/muwamath/pyr3).
+  [electric-sheep-fold](https://github.com/MattAltermatt/electric-sheep-fold), a companion tool to
+  [pyr3](https://github.com/MattAltermatt/pyr3).
 
   ## Required attribution
 
@@ -987,7 +987,7 @@ The orchestration loop. `ensure_corpus_initialized(corpus_root)` runs once per i
 
 
   USER_AGENT = (
-      "electric-sheep-fold/0.1 (companion to pyr3; https://github.com/muwamath/electric-sheep-fold)"
+      "electric-sheep-fold/0.1 (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)"
   )
 
 

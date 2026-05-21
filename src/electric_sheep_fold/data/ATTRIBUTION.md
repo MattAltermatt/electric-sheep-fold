@@ -2,8 +2,8 @@
 
 This directory contains a collection of fractal-flame genomes (`.flam3` files)
 downloaded from the [Electric Sheep](https://electricsheep.org) v3d0 server using
-[electric-sheep-fold](https://github.com/muwamath/electric-sheep-fold), a companion tool to
-[pyr3](https://github.com/muwamath/pyr3).
+[electric-sheep-fold](https://github.com/MattAltermatt/electric-sheep-fold), a companion tool to
+[pyr3](https://github.com/MattAltermatt/pyr3).
 
 ## Required attribution
 

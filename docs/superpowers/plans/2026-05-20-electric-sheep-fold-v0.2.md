@@ -1385,7 +1385,7 @@ The orchestration core. Rewrite to write via `Chunk.add_flam3`, seal on range-co
 
 
   USER_AGENT = (
-      "electric-sheep-fold/0.2 (companion to pyr3; https://github.com/muwamath/electric-sheep-fold)"
+      "electric-sheep-fold/0.2 (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)"
   )
 
 
@@ -2104,7 +2104,7 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
 
   ### Phase 5 — public corpus repo (optional) 🌐
 
-  Push sealed chunks to a separate `muwamath/electric-sheep-fold-corpus` GitHub repo;
+  Push sealed chunks to a separate `MattAltermatt/electric-sheep-fold-corpus` GitHub repo;
   chunked zips are the natural distribution unit.
 
   ### Phase 6 — additional generations 🐑

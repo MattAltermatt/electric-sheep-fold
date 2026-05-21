@@ -32,7 +32,7 @@ point of the whole exercise.
 
 ### Phase 5 — public corpus repo (optional) 🌐
 
-Push sealed chunks to a separate `muwamath/electric-sheep-fold-corpus` GitHub repo;
+Push sealed chunks to a separate `MattAltermatt/electric-sheep-fold-corpus` GitHub repo;
 chunked zips are the natural distribution unit.
 
 ### Phase 6 — additional generations 🐑

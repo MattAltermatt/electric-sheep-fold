@@ -309,7 +309,7 @@ thresholds (~5–10k files per dir is where things bog), and the `XXxxx` mask te
 the bucket boundary at a glance.
 
 **`corpus/` is gitignored:** the tool repo stays small (code only). If we ever publish
-the data, it goes to a separate `muwamath/electric-sheep-fold-corpus` repo (see Phase 4),
+the data, it goes to a separate `MattAltermatt/electric-sheep-fold-corpus` repo (see Phase 4),
 which would carry `ATTRIBUTION.md` un-ignored at its root.
 
 ## 🤝 7. Polite-request defaults
@@ -320,7 +320,7 @@ which would carry `ATTRIBUTION.md` un-ignored at its root.
 | Jitter | ±5s | Uniform [0, jitter] added to delay; avoids perfectly-fixed cadence in logs |
 | Concurrency | 1 | Sequential; parallelism = zero benefit at 20s gap |
 | Timeout | 30s | Connection + read; 5xx + timeout = transient (not recorded) |
-| User-Agent | `electric-sheep-fold/0.1 (companion to pyr3; https://github.com/muwamath/electric-sheep-fold)` | Identifiable + contactable per RFC 9110 §10.1.5 |
+| User-Agent | `electric-sheep-fold/0.1 (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)` | Identifiable + contactable per RFC 9110 §10.1.5 |
 | Retry on transient | None in v0.1 | We just continue; next run retries naturally |
 
 ## 🧪 8. Testing strategy
@@ -356,7 +356,7 @@ All docs get emoji-flavored section headers per user voice preferences.
 
 ## 🛠️ 10. Project bootstrap (Phase 1, deliverable order)
 
-1. `git init -b main`; set local identity to `muwamath / muwamath@proton.me` ✅ *(done)*
+1. `git init -b main`; set local identity to `MattAltermatt / 1435066+MattAltermatt@users.noreply.github.com` ✅ *(done)*
 2. Write `docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md` (this file).
    Commit. ⏳ *(in progress)*
 3. Write the six-doc set (README, VISION, ROADMAP, CHANGELOG, BACKLOG, CLAUDE).
@@ -379,7 +379,7 @@ All docs get emoji-flavored section headers per user voice preferences.
 - **Phase 3 — pyr3 integration.** Pyr3 reads from `corpus/248/` directly as a
   parity-test source. The point of the whole exercise.
 - **Phase 4 — public corpus repo (optional).** Push `corpus/` to a separate
-  `muwamath/electric-sheep-fold-corpus` GitHub repo. ~440MB worst case for full gen 248
+  `MattAltermatt/electric-sheep-fold-corpus` GitHub repo. ~440MB worst case for full gen 248
   (40k × 11KB), well within plain-git limits — no LFS needed. README of that repo
   must surface `ATTRIBUTION.md`; repo description carries the attribution string per
   the Sheep-Pack clause.
@@ -414,6 +414,6 @@ All docs get emoji-flavored section headers per user voice preferences.
 | Jitter | enabled, ±5s | `--jitter 0` to disable |
 | `missing.txt` granularity | per-gen | per-bucket if it grows past ~10k lines |
 | `corpus/` in git? | gitignored in tool repo | inverted in Phase 4 (separate corpus repo) |
-| User-Agent contact URL | `github.com/muwamath/electric-sheep-fold` | swap once the repo URL is real |
+| User-Agent contact URL | `github.com/MattAltermatt/electric-sheep-fold` | swap once the repo URL is real |
 | Tool license | GPL-3.0-or-later (matches pyr3 + flam3 lineage) | MIT / Apache if you'd rather |
 | Python tooling | uv + pyproject.toml | conventional, no setup-py |

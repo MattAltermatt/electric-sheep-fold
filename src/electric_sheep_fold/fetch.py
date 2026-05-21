@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 
 USER_AGENT = (
-    "electric-sheep-fold/0.2 (companion to pyr3; https://github.com/muwamath/electric-sheep-fold)"
+    "electric-sheep-fold/0.2 (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)"
 )
 
 

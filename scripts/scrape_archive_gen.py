@@ -52,7 +52,7 @@ from electric_sheep_fold.extract import is_flam3_content  # noqa: E402
 
 USER_AGENT = (
     "electric-sheep-fold/0.2 archive-preservation "
-    "(https://github.com/muwamath/electric-sheep-fold)"
+    "(https://github.com/MattAltermatt/electric-sheep-fold)"
 )
 BASE = "https://electricsheep.com/archives"
 
