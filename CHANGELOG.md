@@ -1,18 +1,63 @@
 # 📝 Changelog
 
-## Unreleased — 2026-05-20 (live)
+## Unreleased — 2026-05-21 (live)
 
-Dead-gen archive preservation (Phase 7 — one-shot, throwaway).
+### Project rename: `electric-sheep-fold` → `electric-sheep-fold`
 
-- New: `scripts/scrape_archive_gen.py` — throwaway scraper for any dead gen
-  on `electricsheep.com/archives`. Walks `time/N.html` to enumerate sheep
-  ids, fetches each via the `spex` endpoint, writes canonical-named
-  `.flam3` files. Resumable; polite 2s ±1s cadence (static archive content).
-- CLAUDE.md: dual politeness invariant — 20s for v3d0 (live), 2s for
-  electricsheep.com archive (static).
-- Imported local archives — gen 244 (21,051 files into 9 working chunks) +
-  gen 245 (146 files into 1 working chunk). Force-sealing deferred until
-  archive scrape merges with local content (eb19/spex may add ids).
+Original name was reaching for *shearing* (extract / clip wool) but the
+work is *preservation* — and "fold" was English-ambiguous. `sheepfold`
+captures the sanctuary framing. CLI binary stays short: `sheep-fold`.
+
+- Python package: `electric_sheep_fold` → `electric_sheep_fold`
+- CLI binary: `electric-sheep-fold` → `sheep-fold` (short for tab-completion)
+- User-Agent, README, all docs, spec/plan filenames retargeted
+- All 135 tests green after rename
+
+### Phase 8 — comprehensive dead-gen preservation pipeline
+
+Three bugs discovered + fixed after the Phase 7 import surfaced corrupt
+sealed zips (73% empty extractions on gens 191/198):
+
+1. **`extract.py` couldn't parse multi-flame .flam3 files** — animation
+   keyframes use multiple `<flame>` sibling roots (valid flam3, invalid
+   single-root XML). Fix: wrap in synthetic `<sheep>` root and aggregate
+   across all flames. Variations now union across the whole animation.
+2. **Scraper saved 200-OK responses with body `"none\n"`** as 5-byte
+   placeholder .flam3 files. New: `is_flam3_content()` validator (in
+   `extract.py`) — rejects empty, `none`, HTML, non-XML 200s. The scraper
+   now records them as missing.
+3. **Extractor didn't recognize `<get>`-envelope responses** — the archive
+   sometimes serves `<get gen=... id=... job=...><args/><flame/></get>`
+   wrappers around real flame data. Fix: search `.//flame` at any depth.
+
+Scraper rewrite (`scripts/scrape_archive_gen.py`):
+- Three phases per gen: time-page enum → upper-bound discovery (doubling
+  probe + windowed bisection) → gap sweep across `[0, max_id]`.
+- Time-page indexes are partial — gen 244 reaches id 86,435+ but its
+  `time/*.html` view caps at 31,999. Discovery + sweep close the gap.
+- `scripts/preserve_archived_sheep.sh` rewritten as parallel-worker driver
+  (default 4 workers, configurable). Per-gen cadence stays at 2s±1s; total
+  aggregate ~few req/s — gentle for the archive's AWS host.
+
+Cleanup utilities:
+- `scripts/sanitize_scrape_dir.py` — quarantines `none` / empty / HTML
+  files from existing scrape dirs into `missing.txt`. Ran across six
+  scrape dirs: 959 files quarantined (191: 4, 198: 81, 242: 208, 243: 290,
+  244: 227, 245: 149). Surfaced an interesting find: gen 245 has 7,963
+  `<get>`-envelope files that are real flame data (now correctly
+  preserved, not garbage).
+
+Invariants updated:
+- **Politeness** now permits modest cross-gen parallelism for the archive
+  endpoint (still strictly sequential for live v3d0).
+- **Spex response shapes** — three legal envelopes documented in CLAUDE.md
+  (bare flame, multi-flame, `<get>`-wrapped); all accepted by extract.
+
+Rolled back this session's botched imports of gens 191/198/242/243/245 —
+sealed zips were dropped before any code shipped that depended on them.
+
+19 new tests (multi-flame, `<get>` envelope, content validation,
+discovery probe, sweep skip-without-network). Total: **135 passing**.
 
 ## v0.2.0 — 2026-05-20
 
