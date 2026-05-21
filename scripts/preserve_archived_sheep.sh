@@ -7,7 +7,7 @@
 # parallelism is ~few req/s — gentle for the archive's AWS-backed host.
 #
 # Does NOT touch v3d0 — that's the live-fetch flow (gens 247 + 248), use
-# `electric-sheep-fold fetch-all` for those.
+# `sheep-fold fetch-all` for those.
 #
 # Usage:
 #   bash scripts/preserve_archived_sheep.sh                   # all dead gens, default parallelism
@@ -24,8 +24,8 @@
 #   corpus/_scrape-preserve-archived.log                   (driver log)
 #
 # When each gen finishes, import + force-seal:
-#   electric-sheep-fold import corpus/_scrape-<gen>
-#   electric-sheep-fold seal --chunk NNNNN-NNNNN --gen <gen>   # for partial-final chunks
+#   sheep-fold import corpus/_scrape-<gen>
+#   sheep-fold seal --chunk NNNNN-NNNNN --gen <gen>   # for partial-final chunks
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

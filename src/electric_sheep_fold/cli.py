@@ -143,7 +143,7 @@ def status(
     """Show corpus status: per-chunk state + known-missing count."""
     gen_root = corpus / str(gen)
     if not gen_root.exists():
-        typer.echo(f"{gen}: corpus not yet materialized (run `electric-sheep-fold fetch` first)")
+        typer.echo(f"{gen}: corpus not yet materialized (run `sheep-fold fetch` first)")
         return
 
     sealed_zips = list(gen_root.glob("?????-?????.zip"))

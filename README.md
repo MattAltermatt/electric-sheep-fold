@@ -12,10 +12,10 @@ uv pip install -e ".[dev]"
 ## Quickstart
 
 ```sh
-electric-sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
-electric-sheep-fold fetch-all                 # download entire gen 248 (resumable)
-electric-sheep-fold import ~/Downloads/old    # import existing local .flam3s
-electric-sheep-fold status                    # show per-chunk state breakdown
+sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
+sheep-fold fetch-all                 # download entire gen 248 (resumable)
+sheep-fold import ~/Downloads/old    # import existing local .flam3s
+sheep-fold status                    # show per-chunk state breakdown
 ```
 
 For **dead generations** (165, 191, 198, 242, 243, 244, 245, etc.) use the
@@ -23,8 +23,8 @@ throwaway preservation script (Phase 7):
 
 ```sh
 python scripts/scrape_archive_gen.py --gen 242 --out corpus/_scrape-242
-electric-sheep-fold import corpus/_scrape-242
-electric-sheep-fold seal --chunk 00000-09999 --gen 242   # force-seal each chunk
+sheep-fold import corpus/_scrape-242
+sheep-fold seal --chunk 00000-09999 --gen 242   # force-seal each chunk
 ```
 
 ## What it does

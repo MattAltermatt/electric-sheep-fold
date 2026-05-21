@@ -24,7 +24,7 @@ These must NOT be violated without a deliberate spec update:
     `scripts/preserve_archived_sheep.sh`). AWS-backed; aggregate ~few req/s
     is gentle. Never run live + archive at the same time — finish the live
     op first.
-- **Live-vs-dead gen scope:** the live tool (`electric-sheep-fold`) is geared to gens
+- **Live-vs-dead gen scope:** the live tool (`sheep-fold`) is geared to gens
   247 + 248 via v3d0. **Dead gens** (23, 165, 169, 191, 198, 242, 243, 244,
   245 — plus `old` / `very-old` once non-numeric gen support lands) are
   preserved by `scripts/scrape_archive_gen.py` which runs three phases per
@@ -37,7 +37,7 @@ These must NOT be violated without a deliberate spec update:
   3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
      `_missing_404.txt`, GET `spex`. Accept only valid flam3 (see
      `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
-  Output → `electric-sheep-fold import` → force-seal partial chunks. Scripts can be
+  Output → `sheep-fold import` → force-seal partial chunks. Scripts can be
   deleted once each gen is fully preserved.
 - **Spex response shapes:** the archive `spex` endpoint returns multiple
   legal flam3 envelopes — both must be accepted:

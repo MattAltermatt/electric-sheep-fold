@@ -38,9 +38,9 @@ that bar on every modern consumer OS GUI.
    scratch dir; one-shot seal to `.zip` when the range completes.
 3. **Per-chunk `MANIFEST.csv`** inside each sealed zip, carrying enough metadata
    for v0.3's pyr3 index to aggregate without re-reading every flam3.
-4. **Auto-fetch** the entire range of a gen: `electric-sheep-fold fetch-all 248`.
+4. **Auto-fetch** the entire range of a gen: `sheep-fold fetch-all 248`.
 5. **Import** existing local `.flam3` files (anywhere) into the chunked layout:
-   `electric-sheep-fold import <src-dir>`.
+   `sheep-fold import <src-dir>`.
 6. **Automatic v0.1→v0.2 migration** of existing local corpora on first v0.2 fetch.
 7. **All v0.1 invariants preserved**: politeness, sticky-404s, skip-without-network,
    atomic writes, filename preservation, license/attribution obligations.
@@ -60,16 +60,16 @@ that bar on every modern consumer OS GUI.
 
 What ships:
 
-- `electric-sheep-fold fetch START..END [--gen 248] [--delay 20] [--jitter 5]` — same UX,
+- `sheep-fold fetch START..END [--gen 248] [--delay 20] [--jitter 5]` — same UX,
   internally writes to chunked working dirs and seals on range completion.
-- `electric-sheep-fold fetch-all [--gen 248] [--upper 50000]` — fetch the entire id range
+- `sheep-fold fetch-all [--gen 248] [--upper 50000]` — fetch the entire id range
   in one polite session (resumable; idempotent).
-- `electric-sheep-fold import <src-dir> [--gen-from-filename]` — recursively find
+- `sheep-fold import <src-dir> [--gen-from-filename]` — recursively find
   `electricsheep.*.flam3` files in `<src-dir>` and place them into the chunked
   layout. Sealed where range complete.
-- `electric-sheep-fold status [--gen 248]` — extended to show chunk states (N sealed, M
+- `sheep-fold status [--gen 248]` — extended to show chunk states (N sealed, M
   working, K empty).
-- `electric-sheep-fold seal [--gen 248] [--chunk NNNNN-NNNNN]` — manual force-seal of a
+- `sheep-fold seal [--gen 248] [--chunk NNNNN-NNNNN]` — manual force-seal of a
   working chunk whose range isn't fully probed yet (escape hatch for partial-
   range fetches).
 - On-disk layout: `corpus/{gen}/{NNNNN-NNNNN}.zip` (sealed) +
@@ -325,22 +325,22 @@ once, leaves no v0.1 buckets, subsequent calls no-op.
 
 ```sh
 # Same as v0.1
-electric-sheep-fold fetch 0..2000
+sheep-fold fetch 0..2000
 
 # NEW: auto-fetch the whole gen
-electric-sheep-fold fetch-all                          # gen 248, ids 0..50000
-electric-sheep-fold fetch-all --gen 249 --upper 80000
+sheep-fold fetch-all                          # gen 248, ids 0..50000
+sheep-fold fetch-all --gen 249 --upper 80000
 
 # NEW: import existing local flames
-electric-sheep-fold import ~/Downloads/old-sheep-corpus
-electric-sheep-fold import /Volumes/Backup/corpus
+sheep-fold import ~/Downloads/old-sheep-corpus
+sheep-fold import /Volumes/Backup/corpus
 
 # NEW: status shows chunk-level state
-electric-sheep-fold status
+sheep-fold status
 # 248: 4 sealed chunks · 1 working · 1 empty · 8341 sheep total · 31659 known-missing
 
 # NEW: force-seal an incomplete chunk
-electric-sheep-fold seal --chunk 20000-29999
+sheep-fold seal --chunk 20000-29999
 ```
 
 ### 5.8 The `corpus/{gen}/index.csv` (chunk overview)
@@ -441,7 +441,7 @@ skip-without-network rules are untouched.
 - **`test_manifest.py`** — unchanged.
 
 All pure / mock-driven, no real network in CI. Real-server smoke test is one
-manual `electric-sheep-fold fetch 105..110` after install to confirm wire compatibility.
+manual `sheep-fold fetch 105..110` after install to confirm wire compatibility.
 
 ## 🔄 9. Migration & upgrade story
 
@@ -507,7 +507,7 @@ spec). Sketch:
 8. `cli.py` new commands + tests.
 9. Doc updates (README/VISION/ROADMAP/CHANGELOG/BACKLOG/CLAUDE).
 10. Code review (fresh reviewer).
-11. Real-server smoke (`electric-sheep-fold fetch 105..110`) + idempotency + user verify.
+11. Real-server smoke (`sheep-fold fetch 105..110`) + idempotency + user verify.
 12. FF-merge to main.
 
 ## 🔮 12. Roadmap reshape

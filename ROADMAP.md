@@ -45,14 +45,14 @@ One-shot preservation of dead generations via `scripts/scrape_archive_gen.py`
 (throwaway). For each gen with archived content on
 `electricsheep.com/archives`: enumerate sheep ids by walking `time/N.html`
 pages, fetch each via the `spex` endpoint, write canonical-named `.flam3`
-files, then `electric-sheep-fold import` + `seal --chunk` per chunk. Order: smallest
+files, then `sheep-fold import` + `seal --chunk` per chunk. Order: smallest
 gens first (242 → 243 → 245 → 191 → 244 → 198 → 247-archived → 248-archived
 → 165 → 169 → 23/old/very-old). After all preserved, the scripts can be
 deleted; the live tool stays focused on 247/248.
 
 ## 🚧 Todos (next session)
 
-- **Live track** — continue `electric-sheep-fold fetch-all --gen 248` to fill the
+- **Live track** — continue `sheep-fold fetch-all --gen 248` to fill the
   remaining ~37k slots (sticky-404 + sealed chunks make this resumable).
   Then `--gen 247` for what v3d0 still serves live.
 - **Preservation track** — finish gen 242 scrape (resumes at id 476/3584 in

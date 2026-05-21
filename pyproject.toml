@@ -17,7 +17,7 @@ dev = [
 ]
 
 [project.scripts]
-electric-sheep-fold = "electric_sheep_fold.cli:app"
+sheep-fold = "electric_sheep_fold.cli:app"
 
 [build-system]
 requires = ["hatchling"]

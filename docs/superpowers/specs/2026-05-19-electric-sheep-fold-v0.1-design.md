@@ -64,8 +64,8 @@ confirmed are empty), and with first-class respect for the Electric Sheep CC lic
 
 What ships:
 
-- `electric-sheep-fold fetch START..END [--gen 248] [--delay 20] [--jitter 5]` — main loop.
-- `electric-sheep-fold status [--gen 248]` — counts downloaded / known-missing / untried.
+- `sheep-fold fetch START..END [--gen 248] [--delay 20] [--jitter 5]` — main loop.
+- `sheep-fold status [--gen 248]` — counts downloaded / known-missing / untried.
 - Local corpus at `./corpus/248/<bucket>/electricsheep.248.<id:05d>.flam3`.
 - `./corpus/248/missing.txt` — sorted, deduped, per-gen sticky 404 set.
 - `./corpus/ATTRIBUTION.md` — the Sheep-Pack attribution file (license obligation).
@@ -146,7 +146,7 @@ Four modules under `src/electric_sheep_fold/`, each with one job:
 | **`layout.py`** | Pure path / URL math, no I/O | `bucket_for(id)`, `local_path(gen, id, root)`, `remote_url(gen, id, base)` |
 | **`manifest.py`** | Persistent sticky-404 skip-set | `MissingSet(path)` with `contains(id)`, `add(id)`, `save_atomic()` |
 | **`fetch.py`** | Polite orchestration loop | `fetch_range(gen, start, end, root, client, delay, jitter)` |
-| **`cli.py`** | Typer entrypoint | `electric-sheep-fold fetch ...`, `electric-sheep-fold status ...` |
+| **`cli.py`** | Typer entrypoint | `sheep-fold fetch ...`, `sheep-fold status ...` |
 
 **Why this split:** `layout` and `manifest` are pure → unit-testable without network.
 `fetch` takes an injected `httpx.Client` → testable with a `MockTransport` for the
@@ -245,16 +245,16 @@ Git-friendly: small line-oriented diffs as new gaps are discovered.
 
 ```sh
 # Default: gen 248, sheep 0..1999, 20s+jitter pace, ./corpus root
-electric-sheep-fold fetch 0..2000
+sheep-fold fetch 0..2000
 
 # Different gen, snappier
-electric-sheep-fold fetch 0..500 --gen 249 --delay 10 --jitter 2
+sheep-fold fetch 0..500 --gen 249 --delay 10 --jitter 2
 
 # Corpus elsewhere
-electric-sheep-fold fetch 1000..1100 --corpus /Volumes/Big/sheep-corpus
+sheep-fold fetch 1000..1100 --corpus /Volumes/Big/sheep-corpus
 
 # Quick status
-electric-sheep-fold status
+sheep-fold status
 # 248: 327 downloaded · 41 known-missing · 1632 untried in 0..2000
 ```
 
@@ -337,7 +337,7 @@ which would carry `ATTRIBUTION.md` un-ignored at its root.
   - already-in-missing → no network call
 
 All tests pure / mock-driven, no real network. Real-network smoke test is a one-off
-manual `electric-sheep-fold fetch 100..105` after install, not part of the suite.
+manual `sheep-fold fetch 100..105` after install, not part of the suite.
 
 ## 📚 9. The six-doc bootstrap
 
@@ -367,8 +367,8 @@ All docs get emoji-flavored section headers per user voice preferences.
 6. Write `layout.py` + `test_layout.py`. TDD: red → green → commit.
 7. Write `manifest.py` + `test_manifest.py`. TDD: red → green → commit.
 8. Write `fetch.py` + `test_fetch.py` (with `MockTransport`). TDD: red → green → commit.
-9. Write `cli.py` (Typer entrypoint). Smoke-test `electric-sheep-fold --help`.
-10. Real-server smoke test: `electric-sheep-fold fetch 100..105` (~80s wall, ≤5 files).
+9. Write `cli.py` (Typer entrypoint). Smoke-test `sheep-fold --help`.
+10. Real-server smoke test: `sheep-fold fetch 100..105` (~80s wall, ≤5 files).
     Confirms the auto-copy of `ATTRIBUTION.md` into `corpus/` happens on first run.
 11. Update CHANGELOG; user-verify; FF-merge to main.
 

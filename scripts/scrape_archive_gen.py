@@ -15,13 +15,13 @@ runs in three phases per gen:
    non-flam3 200 (e.g. body `"none\n"`) → record missing.
 
 Use for dead gens (165, 169, 191, 198, 242, 243, 244, 245, ...). For LIVE gens
-(247, 248) prefer the main `electric-sheep-fold fetch-all` against v3d0.
+(247, 248) prefer the main `sheep-fold fetch-all` against v3d0.
 
-Output: flat directory of canonical-named files. Feed to `electric-sheep-fold import`.
+Output: flat directory of canonical-named files. Feed to `sheep-fold import`.
 
 Usage:
     python scripts/scrape_archive_gen.py --gen 242 --out corpus/_scrape-242
-    electric-sheep-fold import corpus/_scrape-242
+    sheep-fold import corpus/_scrape-242
 
 Resumable: re-running picks up where it left off (every cache + sticky-404
 ledger is consulted; only true unknowns hit the network).

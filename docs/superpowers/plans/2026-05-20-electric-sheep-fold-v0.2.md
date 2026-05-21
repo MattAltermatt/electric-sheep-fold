@@ -2003,7 +2003,7 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
       """Show corpus status: per-chunk state + known-missing count."""
       gen_root = corpus / str(gen)
       if not gen_root.exists():
-          typer.echo(f"{gen}: corpus not yet materialized (run `electric-sheep-fold fetch` first)")
+          typer.echo(f"{gen}: corpus not yet materialized (run `sheep-fold fetch` first)")
           return
 
       sealed_zips = list(gen_root.glob("?????-?????.zip"))
@@ -2037,9 +2037,9 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
 
   ```bash
   pytest -v
-  electric-sheep-fold --help
-  electric-sheep-fold fetch-all --help
-  electric-sheep-fold import --help
+  sheep-fold --help
+  sheep-fold fetch-all --help
+  sheep-fold import --help
   ```
 
 - [ ] **Step 7e: Update `CHANGELOG.md`** — prepend a `## v0.2.0 — unreleased` entry:
@@ -2057,9 +2057,9 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
     source_url, name, nick, url, xform_count, final_xform, variations) — seam for
     the v0.3 pyr3-facing index
   - Automatic v0.1 → v0.2 migration on first fetch (one-shot, idempotent)
-  - New: `electric-sheep-fold fetch-all` — fetch entire gen range
-  - New: `electric-sheep-fold import <dir>` — bulk-import existing local flames
-  - New: `electric-sheep-fold seal --chunk NNNNN-NNNNN` — force-seal an incomplete chunk
+  - New: `sheep-fold fetch-all` — fetch entire gen range
+  - New: `sheep-fold import <dir>` — bulk-import existing local flames
+  - New: `sheep-fold seal --chunk NNNNN-NNNNN` — force-seal an incomplete chunk
   - `status` extended to show per-chunk state breakdown
   - All v0.1 invariants preserved (politeness, sticky-404, atomic writes,
     filename preservation, license obligations)
@@ -2175,10 +2175,10 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
   ## Quickstart
 
   ```sh
-  electric-sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
-  electric-sheep-fold fetch-all                 # download entire gen 248 (resumable)
-  electric-sheep-fold import ~/Downloads/old    # import existing local .flam3s
-  electric-sheep-fold status                    # show per-chunk state breakdown
+  sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
+  sheep-fold fetch-all                 # download entire gen 248 (resumable)
+  sheep-fold import ~/Downloads/old    # import existing local .flam3s
+  sheep-fold status                    # show per-chunk state breakdown
   ```
 
   ## What it does
@@ -2212,7 +2212,7 @@ Final code task: wire new commands into Typer; refresh docs to match v0.2.
 
   ```bash
   pytest -v
-  electric-sheep-fold --help
+  sheep-fold --help
   ```
 
 - [ ] **Step 7l: Commit.**
@@ -2303,7 +2303,7 @@ Dispatch a fresh `feature-dev:code-reviewer` (or `claude-caliper:implementation-
 
   ```bash
   # Note: do NOT rm -rf corpus/ — keep the v0.1 corpus to also exercise migration
-  electric-sheep-fold fetch 105..110
+  sheep-fold fetch 105..110
   ```
 
   Expected:
@@ -2330,7 +2330,7 @@ Dispatch a fresh `feature-dev:code-reviewer` (or `claude-caliper:implementation-
 - [ ] **Step 9d: Re-run to confirm idempotency.**
 
   ```bash
-  electric-sheep-fold fetch 105..110
+  sheep-fold fetch 105..110
   ```
 
   Expected: completes in <1 second (no network); output shows `5` skip-local +
@@ -2340,7 +2340,7 @@ Dispatch a fresh `feature-dev:code-reviewer` (or `claude-caliper:implementation-
   without committing to a 9+ day fetch):
 
   ```bash
-  electric-sheep-fold fetch-all --upper 110
+  sheep-fold fetch-all --upper 110
   ```
 
   Expected: idempotent — all already-known ids skip-local / skip-known-missing.

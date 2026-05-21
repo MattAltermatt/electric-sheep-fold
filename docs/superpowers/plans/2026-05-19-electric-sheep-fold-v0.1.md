@@ -135,8 +135,8 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
   ## Quickstart
 
   ```sh
-  electric-sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
-  electric-sheep-fold status                    # show what's downloaded vs missing
+  sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
+  sheep-fold status                    # show what's downloaded vs missing
   ```
 
   ## What it does
@@ -268,7 +268,7 @@ No code modules yet — just the package skeleton, the doc set, and the Sheep-Pa
   - Bucket-by-thousand on-disk layout (`248/00xxx/`…`248/40xxx/`)
   - Auto-copied `corpus/ATTRIBUTION.md` (Sheep-Pack obligation per
     [electricsheep.org/license](https://electricsheep.org/license/))
-  - Typer CLI: `electric-sheep-fold fetch`, `electric-sheep-fold status`
+  - Typer CLI: `sheep-fold fetch`, `sheep-fold status`
   - pytest suites for `layout`, `manifest`, `fetch` (mock-transport, no real network)
   ```
 
@@ -1269,7 +1269,7 @@ Typer entrypoint wiring `fetch_range` and a simple `status` command. Range synta
       """Show corpus status: downloaded vs known-missing for the given gen."""
       gen_root = corpus / str(gen)
       if not gen_root.exists():
-          typer.echo(f"{gen}: corpus not yet materialized (run `electric-sheep-fold fetch` first)")
+          typer.echo(f"{gen}: corpus not yet materialized (run `sheep-fold fetch` first)")
           return
 
       downloaded = sum(1 for _ in gen_root.rglob("electricsheep.*.flam3"))
@@ -1286,8 +1286,8 @@ Typer entrypoint wiring `fetch_range` and a simple `status` command. Range synta
 
   ```bash
   pytest -v
-  electric-sheep-fold --help
-  electric-sheep-fold fetch --help
+  sheep-fold --help
+  sheep-fold fetch --help
   ```
 
   Expected: pytest all-green; `--help` prints "Polite mirror of Electric Sheep .flam3 genomes" and lists `fetch` + `status` commands.
@@ -1381,7 +1381,7 @@ Per user convention "code review is a required phase, as the second-to-last phas
 
   ```bash
   rm -rf corpus/                                 # ensure first-run path exercised
-  electric-sheep-fold fetch 100..105
+  sheep-fold fetch 100..105
   ```
 
   Expected behavior:
@@ -1405,7 +1405,7 @@ Per user convention "code review is a required phase, as the second-to-last phas
 - [ ] **Step 7d: Re-run the same command to confirm idempotency.**
 
   ```bash
-  electric-sheep-fold fetch 100..105
+  sheep-fold fetch 100..105
   ```
 
   Expected: completes in well under 1 second (no network) with output like
