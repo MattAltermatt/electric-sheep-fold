@@ -3,10 +3,15 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import datetime
 from xml.etree import ElementTree as ET
 
 log = logging.getLogger(__name__)
+
+# Strip a leading <?xml ... ?> declaration so we can wrap content in a synthetic
+# root to handle multi-flame animation files (multiple <flame> siblings).
+_XML_DECL_RE = re.compile(rb"^\s*<\?xml[^?]*\?>\s*", re.DOTALL)
 
 
 MANIFEST_COLUMNS: tuple[str, ...] = (
@@ -28,6 +33,30 @@ _NON_VARIATION_ATTRS: frozenset[str] = frozenset({
     "weight", "color", "color_speed", "symmetry", "animate", "opacity",
     "var_color", "coefs", "post", "chaos", "plotmode", "name",
 })
+
+
+def is_flam3_content(content: bytes) -> bool:
+    """True iff content contains >=1 valid <flame> element (any root, any depth).
+
+    Defends against the archive's 200-OK + body 'none\\n' placeholder, empty bodies,
+    HTML error pages, and other non-flame responses. Accepts multiple wrapper
+    formats observed in the wild:
+      - bare `<flame>...</flame>` (canonical .flam3)
+      - multi-flame animation: `<flame>...</flame><flame>...</flame>`
+      - `<get gen=... id=... job=...><args.../><flame>...</flame></get>` (archive
+        render-job envelope; the inner flame is the real data)
+    """
+    if not content:
+        return False
+    stripped = _XML_DECL_RE.sub(b"", content).lstrip()
+    # Cheap pre-check: must contain `<flame` at some depth.
+    if b"<flame" not in stripped:
+        return False
+    try:
+        wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
+    except ET.ParseError:
+        return False
+    return wrapper.find(".//flame") is not None
 
 
 def extract_metadata(
@@ -60,28 +89,44 @@ def extract_metadata(
         "variations": "",
     }
 
+    # Flam3 files may contain multiple <flame> siblings (animation keyframes).
+    # Wrap in a synthetic root so XML parsing accepts both single- and multi-flame
+    # forms uniformly. Strip any leading <?xml?> declaration first.
+    stripped = _XML_DECL_RE.sub(b"", content)
     try:
-        root = ET.fromstring(content)
+        wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
     except ET.ParseError as e:
         log.warning("flam3 %d XML parse failed: %s", sheep_id, e)
         return row
 
-    # Root attributes (name/nick/url)
-    row["name"] = root.get("name", "")
-    row["nick"] = root.get("nick", "")
-    row["url"] = root.get("url", "")
+    # `.//flame` so we also pick up flames wrapped in <get>...</get>
+    # render-job envelopes that the archive served for some gens.
+    flames = wrapper.findall(".//flame")
+    if not flames:
+        log.warning("flam3 %d has no <flame> elements", sheep_id)
+        return row
 
-    # Xforms (the structural signal)
-    xforms = root.findall("xform")
+    first = flames[0]
+
+    # First-flame representative metadata (animations are typically self-consistent)
+    row["name"] = first.get("name", "")
+    row["nick"] = first.get("nick", "")
+    row["url"] = first.get("url", "")
+
+    xforms = first.findall("xform")
     row["xform_count"] = len(xforms)
-    row["final_xform"] = root.find("finalxform") is not None
+    row["final_xform"] = any(
+        f.find("finalxform") is not None or f.find(".//finalxform") is not None
+        for f in flames
+    )
 
-    # Variations: union of attribute keys across all xforms minus the non-variations
+    # Variations: union of attribute keys across every xform in every flame
     variations: set[str] = set()
-    for xform in xforms:
-        for attr in xform.attrib:
-            if attr not in _NON_VARIATION_ATTRS:
-                variations.add(attr)
+    for flame in flames:
+        for xform in flame.findall("xform"):
+            for attr in xform.attrib:
+                if attr not in _NON_VARIATION_ATTRS:
+                    variations.add(attr)
     row["variations"] = ";".join(sorted(variations))
 
     return row

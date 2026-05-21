@@ -17,20 +17,37 @@ These must NOT be violated without a deliberate spec update:
 
 - **Politeness:** two cadences by endpoint type:
   - **Live sheep server (`v3d0.sheepserver.net/gen/{247,248}/...`):** 20s ±5s
-    jitter, sequential, identifiable User-Agent. The live server generates
-    fresh genomes; treat it as expensive and rare.
-  - **Static archive (`electricsheep.com/archives/...`):** 2s ±1s jitter,
-    sequential. Archive is static HTML/spex content; faster cadence is fine.
-  - Parallelism across either endpoint is forbidden. Same operator (Scott
-    Draves), so the two cadences also imply *never both at once* — finish one
-    long-running fetch before starting the other.
+    jitter, **strictly sequential**, identifiable User-Agent. The live server
+    generates fresh genomes; treat it as expensive and rare. No parallelism.
+  - **Static archive (`electricsheep.com/archives/...`):** 2s ±1s jitter per
+    worker, **modest cross-gen parallelism allowed** (default 4 workers via
+    `scripts/preserve_archived_sheep.sh`). AWS-backed; aggregate ~few req/s
+    is gentle. Never run live + archive at the same time — finish the live
+    op first.
 - **Live-vs-dead gen scope:** the live tool (`electric-sheep-fold`) is geared to gens
-  247 + 248 via v3d0. **Dead gens** (165, 169, 191, 198, 242, 243, 244, 245,
-  23, "old", "very-old") are preserved by **throwaway scripts** under
-  `scripts/` that scrape `electricsheep.com/archives` via `time/` enumeration
-  + `spex` fetch. Output feeds `electric-sheep-fold import` → force-seal. The scripts
-  exist only to backfill the immutable past; once each gen is preserved,
-  they can be deleted.
+  247 + 248 via v3d0. **Dead gens** (23, 165, 169, 191, 198, 242, 243, 244,
+  245 — plus `old` / `very-old` once non-numeric gen support lands) are
+  preserved by `scripts/scrape_archive_gen.py` which runs three phases per
+  gen against `electricsheep.com/archives`:
+  1. **Time-page enumeration** — harvest ids linked from `time/*.html`.
+     Partial: gen 244's time view stops at id 31,999 even though sheep exist
+     up to id 86,435+.
+  2. **Upper-bound discovery** — doubling probe + windowed binary search via
+     `spex` to find the highest valid sheep id. Cached.
+  3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
+     `_missing_404.txt`, GET `spex`. Accept only valid flam3 (see
+     `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
+  Output → `electric-sheep-fold import` → force-seal partial chunks. Scripts can be
+  deleted once each gen is fully preserved.
+- **Spex response shapes:** the archive `spex` endpoint returns multiple
+  legal flam3 envelopes — both must be accepted:
+  - Bare `<flame>...</flame>` (single frame) or multi-frame
+    `<flame>...</flame><flame>...</flame>` for animation.
+  - `<get gen=... id=... job=...><args.../><flame>...</flame></get>` — a
+    render-job envelope wrapping the real flame. Strip-or-accept; `extract`
+    finds inner flames at any depth.
+  - Reject: empty bodies, `none\n` (5-byte sentinel), HTML error pages, any
+    non-flame XML. These are recorded as missing, never saved as `.flam3`.
 - **Sticky 404s:** once a sheep_id is in `corpus/{gen}/missing.txt`, we never
   re-probe it. ES numbering is append-only; gaps stay gaps. Re-probing wastes our
   time AND the server's.
@@ -59,7 +76,11 @@ These must NOT be violated without a deliberate spec update:
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network
 - `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.
-- `scripts/` — throwaway preservation scripts for dead gens (see
-  `scrape_archive_gen.py`). Not part of the live tool's contract.
+- `scripts/` — preservation scripts for dead gens:
+  - `scrape_archive_gen.py` — enum + discover + sweep against electricsheep.com
+  - `preserve_archived_sheep.sh` — parallel driver across multiple gens
+  - `sanitize_scrape_dir.py` — scrub `none` / empty / HTML files into missing.txt
+  - `seed_scrape_from_local.sh` — preseed scrape dirs from a local sheep archive
+  These are *operational* tools, kept until each gen is fully preserved.
 - `docs/superpowers/specs/` — design specs
 - `docs/superpowers/plans/` — implementation plans
