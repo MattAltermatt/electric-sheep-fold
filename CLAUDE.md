@@ -40,13 +40,14 @@ These must NOT be violated without a deliberate spec update:
      `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
   Output → `sheep-fold import` → force-seal partial chunks. Scripts can be
   deleted once each gen is fully preserved.
-- **MPG-only generations are out of scope for the flam3 pipeline.** `old`,
-  `very-old`, and gen `23` are video-only on the archive — content-addressed
-  by MD5 hash under `archives/{old,very-old}/...` (not `generation-N/`), no
-  `spex` endpoint, no integer id space. They predate the network rendering
-  protocol that produced flam3 genomes. Preserving these would need a
-  separate MPG-download tool and a different storage convention than the
-  chunked-zip flam3 layout; not in current scope. Gen `202` is listed as a
+- **MPG-only generations are permanently out of scope.** `old`, `very-old`,
+  and gen `23` are video-only on the archive — content-addressed by MD5 hash
+  under `archives/{old,very-old}/...` (not `generation-N/`), no `spex`
+  endpoint, no integer id space. They predate the network rendering protocol
+  that produced flam3 genomes. **We will not preserve them here:** license
+  status is unclear (the CC dual-license framework is keyed to flam3
+  genomes), and there is no use case — these are pre-rendered videos, not
+  inputs to the renderer this corpus feeds. Gen `202` is listed as a
   placeholder on the archive index (no date, no link) — known-missing
   upstream, not preservable.
 - **Spex response shapes:** the archive `spex` endpoint returns multiple

@@ -198,3 +198,37 @@ class TestScrapeWithoutTimeView:
         assert len(files) >= 30, (
             f"phase 1 abort prevented preservation: only {len(files)} files written"
         )
+
+    def test_cached_max_id_never_undershoots_on_disk(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """When start_hint window misses but files exist on disk, the cached
+        max must reflect the on-disk floor — otherwise next-run sweep_upper
+        collapses to (-1 + buffer) and we lose the ability to discover any
+        future ids past the current on-disk max.
+        """
+        # Pre-seed three on-disk sheep; highest is id 100.
+        for i in [10, 20, 100]:
+            (tmp_path / f"electricsheep.99.{i:05d}.flam3").write_bytes(FLAM3)
+
+        # Mock: every spex returns 404 (discovery finds nothing new).
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        monkeypatch.setattr(scraper, "_client", lambda: client)
+
+        scraper.scrape(
+            gen="99",
+            out_dir=tmp_path,
+            delay=0.0,
+            jitter=0.0,
+            discovery_window=5,
+            discovery_buffer=20,
+        )
+
+        cached = (tmp_path / "_discovered_max_id.txt").read_text().strip()
+        assert int(cached) >= 100, (
+            f"cached max_id={cached} undershot on-disk floor 100; "
+            f"future runs would collapse sweep range"
+        )

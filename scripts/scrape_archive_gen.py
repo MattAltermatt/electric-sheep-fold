@@ -350,15 +350,24 @@ def scrape(
             log.info("loaded discovered max_id=%d from cache %s", max_id, max_id_cache)
         else:
             on_disk_ids = _ids_on_disk(out_dir, gen)
+            on_disk_floor = max(on_disk_ids, default=-1)
             start_hint = max(
                 max(time_ids, default=0),
-                max(on_disk_ids, default=0),
+                on_disk_floor,
                 1,
             ) + 1
             max_id = discover_max_id(
                 client, gen, start_hint=start_hint,
                 delay=delay, jitter=jitter, window=discovery_window,
             )
+            # Cache must never undershoot ground truth. discover_max_id reports
+            # only ids it *directly observed* via probe; if the start window
+            # missed, it returns -1 even when sheep sit on disk below the
+            # start_hint. Clamping here keeps next-run sweep_upper sensible.
+            if max_id < on_disk_floor:
+                log.info("clamping discovered max_id %d up to on-disk floor %d",
+                         max_id, on_disk_floor)
+                max_id = on_disk_floor
             max_id_cache.write_text(f"{max_id}\n")
             log.info("cached discovered max_id=%d to %s", max_id, max_id_cache)
 
