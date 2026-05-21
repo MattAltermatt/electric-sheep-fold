@@ -25,13 +25,14 @@ These must NOT be violated without a deliberate spec update:
     is gentle. Never run live + archive at the same time — finish the live
     op first.
 - **Live-vs-dead gen scope:** the live tool (`sheep-fold`) is geared to gens
-  247 + 248 via v3d0. **Dead gens** (23, 165, 169, 191, 198, 242, 243, 244,
-  245 — plus `old` / `very-old` once non-numeric gen support lands) are
-  preserved by `scripts/scrape_archive_gen.py` which runs three phases per
-  gen against `electricsheep.com/archives`:
-  1. **Time-page enumeration** — harvest ids linked from `time/*.html`.
-     Partial: gen 244's time view stops at id 31,999 even though sheep exist
-     up to id 86,435+.
+  247 + 248 via v3d0. **Dead, flam3-bearing gens** (165, 169, 191, 198, 242,
+  243, 244, 245) are preserved by `scripts/scrape_archive_gen.py` which runs
+  three phases per gen against `electricsheep.com/archives`:
+  1. **Time-page enumeration (optional)** — harvest ids linked from
+     `time/*.html`. Partial: gen 244's time view stops at id 31,999 even
+     though sheep exist up to id 86,435+. Gens 165 + 169 have NO time view
+     at all (404); phase 1 falls through to phase 2 — discovery is what
+     actually finds the upper bound, time pages are just a free preseed.
   2. **Upper-bound discovery** — doubling probe + windowed binary search via
      `spex` to find the highest valid sheep id. Cached.
   3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
@@ -39,6 +40,15 @@ These must NOT be violated without a deliberate spec update:
      `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
   Output → `sheep-fold import` → force-seal partial chunks. Scripts can be
   deleted once each gen is fully preserved.
+- **MPG-only generations are out of scope for the flam3 pipeline.** `old`,
+  `very-old`, and gen `23` are video-only on the archive — content-addressed
+  by MD5 hash under `archives/{old,very-old}/...` (not `generation-N/`), no
+  `spex` endpoint, no integer id space. They predate the network rendering
+  protocol that produced flam3 genomes. Preserving these would need a
+  separate MPG-download tool and a different storage convention than the
+  chunked-zip flam3 layout; not in current scope. Gen `202` is listed as a
+  placeholder on the archive index (no date, no link) — known-missing
+  upstream, not preservable.
 - **Spex response shapes:** the archive `spex` endpoint returns multiple
   legal flam3 envelopes — both must be accepted:
   - Bare `<flame>...</flame>` (single frame) or multi-frame

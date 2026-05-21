@@ -325,20 +325,24 @@ def scrape(
     max_id_cache = out_dir / "_discovered_max_id.txt"
 
     with _client() as client:
-        # Phase 1: time-page enumeration (cached)
+        # Phase 1: time-page enumeration (cached, optional)
+        # Some dead gens (e.g. 165, 169) lack time/ pages entirely. That's fine —
+        # phase 1 is a free preseed, not a precondition. Discover + sweep still run.
         if ids_cache.exists():
             time_ids = sorted({int(line) for line in ids_cache.read_text().splitlines() if line.strip()})
             log.info("loaded %d time-page ids from cache %s", len(time_ids), ids_cache)
         else:
             last = find_last_page(client, gen)
             if last is None:
-                log.error("gen %s: time/ view not reachable (404). aborting.", gen)
-                return
-            log.info("gen %s: time view spans pages 0..%d (~%d sheep)",
-                     gen, last, (last + 1) * 64)
-            time_ids = enumerate_via_time_pages(client, gen, last, delay, jitter)
-            ids_cache.write_text("\n".join(str(i) for i in time_ids) + "\n")
-            log.info("cached %d time-page ids to %s", len(time_ids), ids_cache)
+                log.warning("gen %s: time/ view not reachable (404). skipping "
+                            "phase 1; discovery + sweep will still run.", gen)
+                time_ids = []
+            else:
+                log.info("gen %s: time view spans pages 0..%d (~%d sheep)",
+                         gen, last, (last + 1) * 64)
+                time_ids = enumerate_via_time_pages(client, gen, last, delay, jitter)
+                ids_cache.write_text("\n".join(str(i) for i in time_ids) + "\n")
+                log.info("cached %d time-page ids to %s", len(time_ids), ids_cache)
 
         # Phase 2: upper-bound discovery (cached)
         if max_id_cache.exists():

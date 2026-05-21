@@ -154,3 +154,47 @@ class TestSweepRejectsNone:
             )
         assert fetched == 2  # ids 1, 3
         assert missing == 0
+
+
+class TestScrapeWithoutTimeView:
+    """Some dead gens (e.g. 165, 169) have no time/index.html in the archive.
+    Discovery + sweep must still run — phase 1 (time enum) is a free preseed,
+    not a precondition.
+    """
+
+    def test_falls_through_to_discovery_when_time_view_404s(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """Time-page 404 must NOT abort the pipeline — phase 2 + 3 still run."""
+        corpus = {i: FLAM3 for i in range(50)}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path
+            if "/time/" in path:
+                return httpx.Response(404)
+            if "/spex" not in path:
+                return httpx.Response(404)
+            try:
+                sid = int(path.rstrip("/").split("/")[-2])
+            except (ValueError, IndexError):
+                return httpx.Response(404)
+            if sid in corpus:
+                return httpx.Response(200, content=corpus[sid])
+            return httpx.Response(404)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        monkeypatch.setattr(scraper, "_client", lambda: client)
+
+        scraper.scrape(
+            gen="165",
+            out_dir=tmp_path,
+            delay=0.0,
+            jitter=0.0,
+            discovery_window=5,
+            discovery_buffer=20,
+        )
+
+        files = list(tmp_path.glob("electricsheep.165.*.flam3"))
+        assert len(files) >= 30, (
+            f"phase 1 abort prevented preservation: only {len(files)} files written"
+        )

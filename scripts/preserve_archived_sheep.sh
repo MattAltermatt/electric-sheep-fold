@@ -31,9 +31,10 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
-# Default dead-gen list per CLAUDE.md (numeric only — 'old' / 'very-old' need
-# importer support before they can flow through; tracked separately).
-DEFAULT_GENS=(23 165 169 191 198 242 243 244 245)
+# Default dead-gen list — flam3-bearing gens only. 'old', 'very-old', and 23
+# are MPG-only on the archive (no spex endpoint, hash-addressed video files);
+# they need a different preservation path and are NOT in this list.
+DEFAULT_GENS=(165 169 191 198 242 243 244 245)
 PARALLEL=4
 
 usage() {
