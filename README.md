@@ -1,64 +1,95 @@
 # 🐑 electric-sheep-fold
 
-> Polite, idempotent mirror of [Electric Sheep](https://electricsheep.org) `.flam3`
-> genomes — companion to [pyr3](../pyr3).
+> A preserved corpus of [Electric Sheep](https://electricsheep.org) `.flam3`
+> genomes — 10 generations, 142k+ flames, 99 distinct variations. Distributed
+> via GitHub Releases. Companion to [pyr3](https://github.com/MattAltermatt/pyr3).
 
-## Install
+## Download the corpus
+
+Each Release is a snapshot in time. Latest is **[v0.2.2](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.2.2)**:
+
+```sh
+# Everything in one bundle (~607MB)
+gh release download v0.2.2 -p corpus-all.zip
+unzip corpus-all.zip
+
+# OR pick a specific generation
+gh release download v0.2.2 -p gen-244.zip
+unzip gen-244.zip
+
+# OR fetch the index first to see what's there
+gh release download v0.2.2 -p INDEX.md
+gh release download v0.2.2 -p index.json
+```
+
+`index.json` is `jq`-queryable; `INDEX.md` is human + agent-readable. See
+[`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
+for query recipes (find flames by variation, pyr3-parity filtering, etc.).
+
+## What's in the corpus
+
+| Gen | Sheep | Genomes | Animations | Source |
+|---|---:|---:|---:|---|
+| 165 | 998 | 242 | 756 | electricsheep.com archive |
+| 169 | 21,745 | 5,299 | 16,446 | electricsheep.com archive |
+| 191 | 21,743 | 5,999 | 15,744 | electricsheep.com archive |
+| 198 | 31,836 | 8,800 | 23,036 | electricsheep.com archive |
+| 242 | 3,388 | 1,168 | 2,220 | electricsheep.com archive |
+| 243 | 5,266 | 5,132 | 134 | electricsheep.com archive |
+| 244 | 33,594 | 7,430 | 26,164 | electricsheep.com archive |
+| 245 | 11,950 | 1,213 | 10,737 | electricsheep.com archive |
+| 247 | 9,006 | 4,090 | 4,915 | v3d0 + archive |
+| 248 | 2,926 | 1,416 | 1,510 | v3d0.sheepserver.net (live) |
+| **Σ** | **142,452** | **40,789** | **101,662** | |
+
+**Kinds** (in `index.json`): each `.flam3` is `genome` (single-flame, fully
+indexed — default for agentic / pyr3 lookups), `animation` (multi-flame
+morph between genomes, frame-count only), or `corrupt` (zero-byte or
+unparseable; currently none).
+
+## The `sheep-fold` toolchain
+
+The corpus is built and maintained by the `sheep-fold` CLI in this repo —
+the toolchain is here because the corpus is here. For contributors and
+corpus maintainers:
 
 ```sh
 uv pip install -e ".[dev]"
+sheep-fold --help
 ```
 
-## Quickstart
+| Command | Purpose |
+|---|---|
+| `sheep-fold fetch RANGE` | Polite range fetch from v3d0 (live gens 247, 248 only) |
+| `sheep-fold fetch-all` | Polite full-gen fetch from v3d0 (resumable) |
+| `sheep-fold import DIR` | Import existing local `.flam3`s into the chunked corpus |
+| `sheep-fold seal --chunk RANGE --gen N` | Force-seal a working chunk |
+| `sheep-fold index` | Rebuild `corpus/_index/{index.json, INDEX.md}` (agent-queryable) |
+| `sheep-fold status` | Show per-gen chunk + missing breakdown |
+| `./scripts/build_release.sh` | Assemble `build/release/` for the next GH Release |
 
-```sh
-sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
-sheep-fold fetch-all                 # download entire gen 248 (resumable)
-sheep-fold import ~/Downloads/old    # import existing local .flam3s
-sheep-fold status                    # show per-chunk state breakdown
-sheep-fold index                     # build agent-queryable corpus/_index/{index.json,INDEX.md}
-```
-
-For **dead generations** (already-frozen flam3 archives — 165, 169, 191, 198,
-242, 243, 244, 245), preserve via the archive scraper and seal as one zip
-per gen:
+For dead generations (165 / 169 / 191 / 198 / 242 / 243 / 244 / 245), the
+archive scraper handles preservation:
 
 ```sh
 python scripts/scrape_archive_gen.py --gen 244 --out corpus/_scrape-244
 sheep-fold import corpus/_scrape-244 --whole-gen
 ```
 
-## What it does
+## Politeness
 
-Walks a half-open `[START, END)` range of sheep IDs in generation 248 (or
-`--gen N`) on the live ES v3d0 server, downloading any `.flam3` files not yet
-in the local `corpus/` directory, at a polite 20-second cadence. Empty sheep
-dirs (HTTP 404s) are recorded once in `corpus/248/missing.txt` and never
-re-probed.
-
-For dead gens the archive scraper hits `electricsheep.com/archives`
-(static content, faster 2s cadence) via `time/N.html` enumeration + a
-doubling-probe / binary-search upper-bound discovery + a gap sweep. The
-`spex` endpoint returns multiple legal envelopes (bare `<flame>`,
-multi-flame animation, `<get>`-wrapped) — all accepted.
-
-Storage shape depends on the gen's biography:
-
-- **Live-preserved gens (247, 248)** — chunked into 10k id-range `.zip`
-  bundles (`corpus/248/00000-09999.zip` etc.), sealed as ranges complete.
-- **Dead-preserved gens (165 / 169 / 191 / 198 / 242 / 243 / 244 / 245)** —
-  one whole-gen zip per gen (`corpus/244/00000-86575.zip`), since the
-  id space is frozen at the time of preservation.
-
-Each sealed zip carries a `MANIFEST.csv` as its first entry (id, sha256,
-xform_count, variations, designer nick, source URL, …) — the seam for the
-v0.3 pyr3-facing index. Bundles open in macOS Finder / Windows Explorer /
-Linux file managers out-of-the-box — no extra tool needed.
+The live ES server (`v3d0.sheepserver.net`, lighttpd 1.4.33) and the
+electricsheep.com archive (S3 backed) are volunteer / shared infrastructure
+preserving 20+ years of crowdsourced generative art. `sheep-fold` treats
+them accordingly: **20s ± 5s sequential** for v3d0, **2s ± 1s** per worker
+for the archive (modest cross-gen parallelism OK). Identifiable User-Agent;
+sticky-404 memory (`corpus/{gen}/missing.txt`) so we never re-probe known
+gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).
 
 ## Docs
 
-- [VISION.md](VISION.md) — the why
-- [ROADMAP.md](ROADMAP.md) — phases + live todos
+- [VISION.md](VISION.md) — why this corpus exists
+- [ROADMAP.md](ROADMAP.md) — shipped phases + planned Releases
 - [CHANGELOG.md](CHANGELOG.md) · [BACKLOG.md](BACKLOG.md) · [CLAUDE.md](CLAUDE.md)
 - Design specs:
   [v0.1](docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md) ·
@@ -67,9 +98,11 @@ Linux file managers out-of-the-box — no extra tool needed.
 
 ## License
 
-**Tool code (this repo):** [GPL-3.0-or-later](LICENSE).
+**Corpus data:** Creative Commons per [electricsheep.org/license](https://electricsheep.org/license/).
+Algorithm-generated sheep are CC BY-NC; human-designed sheep (those with a
+`<flame nick=...>` attribute) are CC BY. `ATTRIBUTION.md` is bundled with
+every Release per the Sheep-Pack clause.
 
-**Corpus data (downloaded `.flam3` files):** Creative Commons, per
-[electricsheep.org/license](https://electricsheep.org/license/). Algorithm-generated
-sheep are CC BY-NC; human-designed sheep are CC BY. The Sheep-Pack attribution file
-is auto-written to `corpus/ATTRIBUTION.md` on first `fetch`.
+**`sheep-fold` toolchain (this repo's code):** [GPL-3.0-or-later](LICENSE),
+matching pyr3 and the upstream [flam3](https://github.com/scottdraves/flam3)
+lineage from Scott Draves (2003).
