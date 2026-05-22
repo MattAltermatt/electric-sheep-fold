@@ -12,8 +12,15 @@ htmlcov/
 .venv/
 venv/
 
-# Corpus data (large; lives in a separate repo if ever published — see ROADMAP Phase 4)
+# Corpus data — distributed via GitHub Releases, not tracked in git.
+# The repo's git tree holds the tooling; the corpus itself is published as
+# Release assets (per-gen zips + corpus-all.zip + INDEX.md + index.json +
+# ATTRIBUTION.md). See `scripts/build_release.sh` and `docs/release-notes-*.md`.
 /corpus/
+
+# Release-build staging dir (assembled by scripts/build_release.sh).
+# Already covered by `build/` above; kept explicit for the corpus context.
+/build/
 
 # Session-local scratch (handoff notes, daily logs) — never commit
 /.remember/
