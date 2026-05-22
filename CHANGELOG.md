@@ -2,6 +2,20 @@
 
 ## v0.2.1 — 2026-05-21
 
+### Phase 10 — live-gen guard + gen 247 chunked ingest
+
+`sheep-fold fetch` / `fetch-all` now hard-reject any `--gen` value not in
+`LIVE_GENS = {247, 248}` with a hint to use `scripts/scrape_archive_gen.py +
+import --whole-gen` for dead gens. Extending the set when ES rolls gen 249 is
+a one-line edit in `layout.py`. 12 new CLI guard tests (160 total green).
+
+Gen 247 ingested into the chunked 10k-id layout from `corpus/_scrape-247/`
+(9007 flam3s preseeded from `~/dev/sheep/247/`, ids `0`–`25845`) → three
+working chunks `00000-09999`, `10000-19999`, `20000-29999` in `corpus/247/`.
+No auto-seal yet (no `missing.txt` to prove range completion); chunks will
+seal naturally as `fetch-all --gen 247` against v3d0 fills the gaps. Source
+`_scrape-247/` symlink dir removed post-import.
+
 ### Phase 9 — dead-gen whole-zip policy
 
 Dead-preserved gens (sourced from the `electricsheep.com/archives` static
