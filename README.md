@@ -6,21 +6,26 @@
 
 ## Download the corpus
 
-Each Release is a snapshot in time. Latest is **[v0.2.2](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.2.2)**:
+Each Release is a snapshot in time. Latest is **[v0.3.0](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.3.0)**:
 
 ```sh
-# Everything in one bundle (~607MB)
-gh release download v0.2.2 -p corpus-all.zip
+# Everything in one bundle (~535MB)
+gh release download v0.3.0 -p corpus-all.zip
 unzip corpus-all.zip
 
 # OR pick a specific generation
-gh release download v0.2.2 -p gen-244.zip
+gh release download v0.3.0 -p gen-244.zip
 unzip gen-244.zip
 
 # OR fetch the index first to see what's there
-gh release download v0.2.2 -p INDEX.md
-gh release download v0.2.2 -p index.json
+gh release download v0.3.0 -p INDEX.md
+gh release download v0.3.0 -p index.json
 ```
+
+Each per-gen zip contains `MANIFEST.csv` + `missing.txt` (sticky-404 ids
+for that gen) + flat `electricsheep.{gen}.{id}.flam3` files. The
+`missing.txt` is new in v0.3 and tells consumers which ids are
+confirmed-empty without having to probe the upstream server.
 
 `index.json` is `jq`-queryable; `INDEX.md` is human + agent-readable. See
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
@@ -38,9 +43,9 @@ for query recipes (find flames by variation, pyr3-parity filtering, etc.).
 | 243 | 5,266 | 5,132 | 134 | electricsheep.com archive |
 | 244 | 33,594 | 7,430 | 26,164 | electricsheep.com archive |
 | 245 | 11,950 | 1,213 | 10,737 | electricsheep.com archive |
-| 247 | 9,006 | 4,090 | 4,915 | v3d0 + archive |
+| 247 | 9,861 | 4,501 | 5,360 | v3d0 + archive |
 | 248 | 2,926 | 1,416 | 1,510 | v3d0.sheepserver.net (live) |
-| **Σ** | **142,452** | **40,789** | **101,662** | |
+| **Σ** | **143,307** | **41,200** | **102,107** | |
 
 **Kinds** (in `index.json`): each `.flam3` is `genome` (single-flame, fully
 indexed — default for agentic / pyr3 lookups), `animation` (multi-flame
@@ -62,18 +67,19 @@ sheep-fold --help
 |---|---|
 | `sheep-fold fetch RANGE` | Polite range fetch from v3d0 (live gens 247, 248 only) |
 | `sheep-fold fetch-all` | Polite full-gen fetch from v3d0 (resumable) |
-| `sheep-fold import DIR` | Import existing local `.flam3`s into the chunked corpus |
-| `sheep-fold seal --chunk RANGE --gen N` | Force-seal a working chunk |
+| `sheep-fold import DIR` | Import existing local `.flam3`s into `corpus/{gen}/` (flat loose) |
 | `sheep-fold index` | Rebuild `corpus/_index/{index.json, INDEX.md}` (agent-queryable) |
-| `sheep-fold status` | Show per-gen chunk + missing breakdown |
-| `./scripts/build_release.sh` | Assemble `build/release/` for the next GH Release |
+| `sheep-fold status` | Show per-gen loose-file + missing counts |
+| `sheep-fold release-build` | Build `build/release/gen-{N}.zip` + `corpus-all.zip` from corpus state |
+| `sheep-fold unseal` / `verify-unseal` | One-time v0.2 → v0.3 migration + consistency check |
+| `./scripts/build_release.sh` | Thin wrapper around `sheep-fold release-build` for the next GH Release |
 
 For dead generations (165 / 169 / 191 / 198 / 242 / 243 / 244 / 245), the
 archive scraper handles preservation:
 
 ```sh
 python scripts/scrape_archive_gen.py --gen 244 --out corpus/_scrape-244
-sheep-fold import corpus/_scrape-244 --whole-gen
+sheep-fold import corpus/_scrape-244
 ```
 
 ## Politeness
@@ -94,7 +100,8 @@ gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).
 - Design specs:
   [v0.1](docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md) ·
   [v0.2 chunked-zip](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) ·
-  [v0.2.1 dead-gen whole-zip](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md)
+  [v0.2.1 dead-gen whole-zip](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md) ·
+  [v0.3 loose corpus](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md)
 
 ## License
 

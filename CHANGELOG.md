@@ -1,5 +1,62 @@
 # 📝 Changelog
 
+## v0.3.0 — 2026-05-22
+
+### Phase 12b — loose-corpus separation; release artifact built on demand
+
+The "sealed-immutable whole-gen zip" model of v0.2 conflated the on-disk
+corpus state with the distribution artifact. v0.2.2's chunk-shape
+collapse destroyed sticky-404 provenance for gens 247 + 248 because
+`missing.txt` lived outside the sealed zip. v0.3 separates the two:
+
+- **`corpus/{gen}/`** is now flat `electricsheep.{gen}.{id}.flam3` files
+  + `missing.txt` for ALL gens (live + dead). Same shape everywhere; the
+  gen's biography is no longer encoded in the data layout.
+- **`build/release/`** holds the consumer-facing zips, built on demand
+  from corpus state via `sheep-fold release-build`. Pure derivative;
+  reproducible.
+- **`missing.txt` now travels inside the release zip** alongside
+  `MANIFEST.csv`. Sticky-404 provenance is artifact-permanent — the
+  v0.2.2-class data-loss incident can't recur because reseal can't lose
+  what isn't separate.
+
+**CLI delta:**
+
+- `sheep-fold seal` — **removed.** Sealing the working dir was the
+  v0.2.x ceremony around chunk completion; the v0.3 working dir IS the
+  canonical state.
+- `sheep-fold release-build` — **new.** Builds `build/release/gen-{N}.zip`
+  + `corpus-all.zip` + index + attribution from corpus state.
+- `sheep-fold unseal` + `sheep-fold verify-unseal` — **new.** One-time
+  v0.2 → v0.3 migration tool (SIGKILL-safe 6-step state machine) +
+  consistency check for the daemon-resume guard.
+- `sheep-fold import` — `--whole-gen` flag dropped (now default and only mode).
+
+**Retired invariants** (see CLAUDE.md):
+
+- Sealed-immutable
+- Range-completion is the seal trigger
+- Chunk shape: whole-gen for every gen
+
+**New invariants** (see CLAUDE.md):
+
+- Loose-corpus, append-only
+- Release-built on demand
+- Daemon-verified id counts post-migration
+
+**Code shape:** ~250 LOC out, ~150 LOC in. `chunks.py` retired entirely;
+zip-assembly logic moved to `release.py`. `fetch.py` simplified
+substantially (no chunk-aware loops, no seal sweep). `importer.py`
+collapsed from dual chunked/whole-gen modes to one flat-write path.
+
+**Migration ran clean** against the live corpus: 143,307 loose files
+across 10 gens, 74,029 sticky-404 entries preserved. Live-fetch resume
+point captured at gen 247 / id 32085 (last recorded 404). Daemon will
+restart on the v0.3 code path post-merge.
+
+Spec: [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md).
+v0.2.5 is the off-machine fallback artifact (final sealed-shape snapshot).
+
 ## v0.2.5 — 2026-05-22
 
 ### Phase 11e — per-xform variation-count index fields

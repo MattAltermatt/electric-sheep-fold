@@ -54,18 +54,27 @@ The live ES server (v3d0, lighttpd 1.4.33) is volunteer infrastructure.
 - **Identifiable User-Agent** that names the project and links the repo,
   so server admins can reach us if our load is ever a problem.
 
-## Storage shape
+## Storage shape (v0.3)
 
-One sealed `.zip` per generation under `corpus/{gen}/`. The zip contains a
-`MANIFEST.csv` as its first entry (id, sha256, fetched_at, source_url,
-xform_count, variations, designer nick, …) followed by each `.flam3` file
-with its canonical name (`electricsheep.{gen}.{id:05d}.flam3`). The
-`MANIFEST.csv` schema is the seam the `index.json` aggregator reads from.
+The on-disk corpus is **loose**: `corpus/{gen}/` is a flat directory of
+`electricsheep.{gen}.{id:05d}.flam3` files plus a `missing.txt` tracking
+confirmed-empty ids. Same shape for live and dead gens. Mutated only by
+`fetch-all` / `import` (append a flam3 OR append an id to `missing.txt`);
+never re-sealed, never re-keyed.
 
-For distribution, the Release-build script renames each per-gen zip to
-`gen-{N}.zip` and bundles the lot into `corpus-all.zip`. The Release tag
-(e.g. `v0.2.2`) carries the snapshot version; filenames stay stable
-across Releases.
+For distribution, `sheep-fold release-build` reads the corpus on demand
+and emits per-gen zips into `build/release/gen-{N}.zip`, each containing
+`MANIFEST.csv` (rebuilt from current state — schema: id, sha256,
+fetched_at, source_url, xform_count, variations, designer nick, …) +
+`missing.txt` (sticky-404 travels with the artifact) + the flat
+`.flam3` files. The lot is bundled into `corpus-all.zip` for full-corpus
+downloaders. The Release tag (e.g. `v0.3.0`) carries the snapshot
+version; filenames stay stable across Releases.
+
+The split (loose corpus → built release zip) fixes the v0.2.2 incident
+class where `missing.txt` lived outside the sealed zip and got lost in
+manual reseal operations. v0.3 release zips are pure derivatives; the
+corpus dir is the only mutable state.
 
 ## License lineage
 
