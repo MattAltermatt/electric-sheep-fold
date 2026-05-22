@@ -1,5 +1,35 @@
 # 📝 Changelog
 
+## v0.2.2 — 2026-05-21
+
+### Phase 11b — corpus-first pivot + Release-based distribution
+
+Repo identity refocused: **the corpus IS the deliverable, tooling is the
+means.** Concrete changes:
+
+- **GitHub Releases supersede LFS / separate-repo plans.** Each Release is
+  a corpus snapshot tagged in time. Assets: per-gen `gen-{N}.zip` (10
+  files, one per generation) + `corpus-all.zip` mega-bundle + `INDEX.md` +
+  `index.json` + `ATTRIBUTION.md`. Stable filenames; Release tag carries
+  the version. Unlimited free downloads via GitHub.
+- **Chunk shape unified to whole-gen for all gens.** v0.2.1's live-vs-dead
+  split (one day old) is dropped — the "10k chunks = distribution unit"
+  rationale died under Release-based distribution. Gens 247 + 248
+  collapsed from chunked layout (3 + 2 chunks respectively) into single
+  whole-gen zips matching the 8 dead gens. `corpus/247/00000-29999.zip`
+  (9006 sheep, 42MB), `corpus/248/00000-19999.zip` (2926 sheep, 14MB).
+- **`scripts/build_release.sh` assembles the Release.** Renames per-gen
+  zips to `gen-{N}.zip` (stable Release naming), builds the mega-bundle,
+  copies index + attribution. Re-runnable; overwrites `build/release/`.
+- **Doc refocus** (one commit per doc): README leads with the corpus + a
+  `gh release download` quickstart; the tool gets a "Toolchain" section
+  below. VISION reframed as preservation + pyr3-facing index. ROADMAP
+  Phase 13 ("separate corpus repo, optional") is now obsolete — THIS repo
+  is the corpus repo.
+
+First snapshot Release: **v0.2.2** — 142,452 flames across 10 gens,
+40,790 genomes, 99 distinct variations, 0 corrupt.
+
 ## v0.2.1 — 2026-05-21
 
 ### Phase 11a — corpus index + agentic skill
