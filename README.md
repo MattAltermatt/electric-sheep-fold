@@ -16,6 +16,7 @@ sheep-fold fetch 0..100              # download sheep 0–99 in gen 248
 sheep-fold fetch-all                 # download entire gen 248 (resumable)
 sheep-fold import ~/Downloads/old    # import existing local .flam3s
 sheep-fold status                    # show per-chunk state breakdown
+sheep-fold index                     # build agent-queryable corpus/_index/{index.json,INDEX.md}
 ```
 
 For **dead generations** (already-frozen flam3 archives — 165, 169, 191, 198,

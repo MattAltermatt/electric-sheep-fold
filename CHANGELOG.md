@@ -2,6 +2,41 @@
 
 ## v0.2.1 — 2026-05-21
 
+### Phase 11a — corpus index + agentic skill
+
+New `sheep-fold index` CLI command walks every sealed zip + working chunk in
+`corpus/`, parses each `.flam3`, and emits two outputs to `corpus/_index/`:
+
+- `index.json` — one record per flame: `id`, `gen`, `sheep_id`, `kind`
+  (`genome` / `animation` / `corrupt`), `sealed` flag, plus structural
+  metadata for genomes (variations list, xform_count, has_final_xform,
+  has_post_affine, has_chaos, supersample, highlight_power,
+  negative_weight_xforms, name/nick/url, dims, palette_mode, background, …).
+- `INDEX.md` — aggregated tables: per-gen corpus shape, variation usage
+  histogram, structural feature counts, xform distribution, query recipes.
+
+Agent-facing surface: `.claude/skills/pyr3-corpus-index/SKILL.md` documents
+when to invoke + `jq` recipes for variation lookup, pyr3-parity filtering,
+rare-variation stress-test selection.
+
+Schema is informed by pyr3's known limitations (`has_chaos`, `supersample`,
+`highlight_power`) so an agent can find parity-friendly genomes in one
+filter. The canonical 101-element flam3 `var_t` set lives in `index.py`
+(99 standard + `hemisphere` + `post_curl` from ES corpora).
+
+First full corpus index: **142,453 flames** across 10 gens — 40,790 genomes
+(28.6%), 101,662 animations (71.4%), 1 corrupt; **99 distinct variations
+seen**. ~45s to build; stdlib-only. 12 new tests (172 total).
+
+### Phase 10b — partial unseal for in-progress live chunks
+
+After the live-gen guard landed, the highest-id chunk in 247 (`20000-29999`)
+and 248 (`10000-19999`) were unsealed back to working dirs so future
+`fetch-all` runs against v3d0 can continue extending them. Sealed chunks
+in the same gens (`247/00000-09999`, `247/10000-19999`, `248/00000-09999`)
+stay sealed — those id ranges are treated as "done with this corpus"
+relative to the archive snapshot.
+
 ### Phase 10 — live-gen guard + gen 247 chunked ingest
 
 `sheep-fold fetch` / `fetch-all` now hard-reject any `--gen` value not in

@@ -4,9 +4,16 @@
 
 ```sh
 uv pip install -e ".[dev]"         # editable install + pytest
-pytest -q                          # full test suite (~150 tests, no real network)
-sheep-fold --help                  # CLI entry — fetch / fetch-all / import / seal / status
+pytest -q                          # full test suite (~170 tests, no real network)
+sheep-fold --help                  # CLI entry — fetch / fetch-all / import / seal / status / index
+sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
 ```
+
+Agentic queries against the corpus are documented in
+[`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
+— `jq` recipes for variation lookup, pyr3-parity filtering, etc. Re-run
+`sheep-fold index` after any `import` / `seal` / `unseal` to keep the
+index in sync with the corpus.
 
 ## Conventions
 

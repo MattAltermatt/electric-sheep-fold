@@ -12,6 +12,7 @@ import typer
 from electric_sheep_fold.chunks import Chunk
 from electric_sheep_fold.fetch import fetch_all, fetch_range, make_client
 from electric_sheep_fold.importer import import_dir
+from electric_sheep_fold.index import build_index
 from electric_sheep_fold.layout import LIVE_GENS, chunk_for, remote_url, sealed_zip_path
 from electric_sheep_fold.manifest import MissingSet
 
@@ -167,6 +168,34 @@ def seal(
         fetched_at_for=lambda sid: datetime.now(tz=timezone.utc),
     )
     typer.echo(f"sealed chunk {c.range_str}")
+
+
+@app.command()
+def index(
+    corpus: Path = typer.Option(Path("./corpus")),
+    out: Path = typer.Option(
+        None,
+        "--out",
+        help="Where to write index.json + INDEX.md (default: {corpus}/_index/).",
+    ),
+) -> None:
+    """Build a machine-queryable corpus index (index.json + INDEX.md).
+
+    Walks every sealed zip and working chunk dir; classifies each flam3 into
+    genome / animation / corrupt; emits per-flame structural metadata
+    (variations, xform_count, pyr3-limitation flags). Re-runnable; overwrites.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    out_dir = out if out is not None else (corpus / "_index")
+    summary = build_index(corpus, out_dir)
+    typer.echo(
+        f"\nindexed {summary['total']:,} flames "
+        f"({summary['genomes']:,} genome · {summary['animations']:,} animation "
+        f"· {summary['corrupt']:,} corrupt) · "
+        f"{summary['distinct_variations']} distinct variations"
+    )
+    typer.echo(f"wrote {out_dir / 'index.json'}")
+    typer.echo(f"wrote {out_dir / 'INDEX.md'}")
 
 
 @app.command()
