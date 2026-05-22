@@ -173,6 +173,91 @@ for zp in sorted(Path(f'corpus/{gen}').glob('?????-?????.zip')):
 - Output goes to `corpus/_index/` by default; gitignored along with the
   rest of `corpus/`.
 
+## 📋 Pending hand-off — per-xform variation-count fields
+
+**Status:** queued (recorded 2026-05-22). Triggered by **pyr3 v0.16** surfacing
+the GPU `MAX_VARIATIONS_PER_XFORM = 4` cap — current `variations[]` is the
+genome-level UNION, which loses per-xform density. The pyr3 session is paused
+on this question; once the index is rebuilt with these fields and pushed to
+`origin/main`, pyr3 pulls and queries directly to make a data-driven decision
+on whether v0.17 should bump the cap to 8 or 16.
+
+### Schema additions (per-genome entry)
+
+Add these fields alongside the existing `xform_count` / `variations[]` /
+`has_symmetry` / etc:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `xform_var_counts` | `[int]` | per-xform array, `len == xform_count` (pre-symmetry-expansion); preserves full distribution |
+| `max_var_per_xform` | int | `max(xform_var_counts)` |
+| `mean_var_per_xform` | float | `mean(xform_var_counts)` rounded to 2 decimals |
+| `xforms_with_5plus_vars` | int | count of xforms exceeding pyr3:gpu's current cap of 4 (auto-route gating signal) |
+| `final_xform_var_count` | int? | variations on `<finalxform>` if present, else `null` |
+
+The full per-xform array is most flexible — downstream tools compute their own
+aggregates without re-scanning `.flam3` files. The 3 derived fields are cheap
+convenience.
+
+### Counting logic (verbatim flam3 semantics)
+
+A "variation" on an `<xform>` is any attribute whose **name matches the
+canonical flam3 variation name set** (the same names already populated in the
+current `variations[]` field — the `var_t` enum, 101 entries including the
+two ES-corpus extras `hemisphere` + `post_curl`). The attribute VALUE is the
+variation's weight (per-variation), distinct from the xform pick-weight
+(`weight=` attribute).
+
+```xml
+<xform weight="0.5" color="0" coefs="..." linear="0.3" spherical="0.7"/>
+<!-- ⇒ 2 variations (linear, spherical) -->
+
+<xform weight="0.33" coefs="..." pdj="0.41" pdj_a="..." pdj_b="..."
+       pdj_c="..." pdj_d="..." blade="0.17"/>
+<!-- ⇒ 2 variations (pdj, blade). pdj_a/b/c/d are PARAMS of pdj, not
+     variations themselves. Filter by EXACT name match against var_t;
+     do NOT count params (they all have underscore-suffix names). -->
+```
+
+**Edge cases:**
+- **`<finalxform>` elements** — include in `xform_var_counts` (treat as a
+  regular xform); also surface `final_xform_var_count` as a sibling for
+  downstream tools that want to isolate it.
+- **`oscope` ↔ `oscilloscope` alias** — both map to the same variation. Count
+  once per xform if both appear (unusual; defensive).
+- **Purely-affine xforms** (zero variations) — count `0`, include in array.
+
+### Validation
+
+After regenerating:
+- `len(xform_var_counts) == xform_count` for every entry
+- `sum(xform_var_counts) >= len(variations[])` (sum counts each occurrence;
+  `variations[]` dedupes)
+- `max_var_per_xform == max(xform_var_counts)`
+- `mean_var_per_xform == round(mean(xform_var_counts), 2)`
+- `xforms_with_5plus_vars == sum(1 for n in xform_var_counts if n >= 5)`
+
+Hand-verify against a known sample (e.g. `244/00000` — count variations per
+xform manually, compare).
+
+### Bonus aggregates (only if cheap)
+
+While the `.flam3` parser is loaded:
+- `has_post_affine_per_xform: [bool]` — currently only genome-level
+- `max_xform_weight: float` — largest xform pick-weight (chaos-game
+  unevenness signal)
+
+Skip if they complicate the schema; the variation counts are the primary ask.
+
+### Deliverables
+
+1. Extend `src/electric_sheep_fold/index.py` with the new fields.
+2. Rebuild: `sheep-fold index`.
+3. Verify against the hand-counted sample.
+4. Update this SKILL.md's schema table (move the new fields into the main
+   genome schema, delete this hand-off section).
+5. Commit + push to `main` (feature branch first per project workflow).
+
 ## Why these specific fields
 
 The pyr3-limitation fields (`has_chaos`, `supersample`, `highlight_power`)
