@@ -70,8 +70,14 @@ These must NOT be violated without a deliberate spec update:
   the ES attribution scheme — never rename, never strip, never re-encode.
 - **Tool license:** GPL-3.0-or-later (matches pyr3, matches flam3 upstream).
   Corpus data is CC per ES policy — see [`README.md`](README.md).
-- **Chunk size:** 10,000 ids per chunk; chunks named `NNNNN-NNNNN.zip`. Don't
-  change without a deliberate spec update and a migration story.
+- **Chunk size — live vs dead split** ([v0.2.1 addendum](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md)):
+  - **Live-preserved gens** (sourced via `v3d0.sheepserver.net`, gens 247 +
+    248) → **10k ids per chunk**, chunks named `NNNNN-NNNNN.zip`. Keep this
+    shape forever, even after the upstream gen dies.
+  - **Dead-preserved gens** (sourced via `electricsheep.com/archives`, gens
+    165 / 169 / 191 / 198 / 242 / 243 / 244 / 245) → **one whole-gen zip**
+    spanning `[0, max_observed_id + 1)`, e.g. `00000-86475.zip` for gen 244.
+  - A gen's chunk shape is fixed at first preservation; never re-chunked.
 - **Sealed-immutable:** once a chunk is sealed (`.zip` exists), its contents are
   frozen. No append-to-zip. Re-key flow is `reseal` (backlog).
 - **Range-completion is the seal trigger:** a chunk seals when every id in

@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 BASE_URL_DEFAULT = "http://v3d0.sheepserver.net"
+ARCHIVE_BASE_URL = "https://electricsheep.com/archives"
 CHUNK_SIZE = 10_000
 
 
@@ -53,3 +54,8 @@ def remote_url(gen: int, sheep_id: int, base: str = BASE_URL_DEFAULT) -> str:
     /gen/248/100/, not /gen/248/00100/).
     """
     return f"{base}/gen/{gen}/{sheep_id}/{flam3_filename(gen, sheep_id)}"
+
+
+def archive_url(gen: int, sheep_id: int, base: str = ARCHIVE_BASE_URL) -> str:
+    """Source URL for a dead-gen sheep, served by electricsheep.com `spex` endpoint."""
+    return f"{base}/generation-{gen}/{sheep_id}/spex"

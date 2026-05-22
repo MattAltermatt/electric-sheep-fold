@@ -4,8 +4,10 @@ from pathlib import Path
 import pytest
 
 from electric_sheep_fold.layout import (
+    ARCHIVE_BASE_URL,
     BASE_URL_DEFAULT,
     CHUNK_SIZE,
+    archive_url,
     chunk_for,
     chunk_range_str,
     flam3_filename,
@@ -117,6 +119,19 @@ class TestRemoteUrl:
 
     def test_base_default_constant(self):
         assert BASE_URL_DEFAULT == "http://v3d0.sheepserver.net"
+
+
+class TestArchiveUrl:
+    def test_archive_url_shape(self):
+        assert archive_url(244, 100) == (
+            "https://electricsheep.com/archives/generation-244/100/spex"
+        )
+
+    def test_archive_url_zero_id(self):
+        assert archive_url(244, 0).endswith("/generation-244/0/spex")
+
+    def test_archive_base_constant(self):
+        assert ARCHIVE_BASE_URL == "https://electricsheep.com/archives"
 
 
 class TestNoBucketSymbol:

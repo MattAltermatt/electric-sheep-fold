@@ -100,10 +100,25 @@ def fetch_all_cmd(
 def import_cmd(
     src: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True),
     corpus: Path = typer.Option(Path("./corpus")),
+    whole_gen: bool = typer.Option(
+        False,
+        "--whole-gen",
+        help="Seal as one whole-gen zip (for dead-preserved gens from "
+        "electricsheep.com archive). Also copies _missing_404.txt → missing.txt.",
+    ),
+    gen: int | None = typer.Option(
+        None,
+        "--gen",
+        help="Generation number (required with --whole-gen if src has multiple gens; "
+        "inferred from filenames otherwise).",
+    ),
 ) -> None:
     """Recursively import existing local electricsheep.*.flam3 files."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    stats = import_dir(src, corpus)
+    try:
+        stats = import_dir(src, corpus, whole_gen=whole_gen, gen=gen)
+    except ValueError as e:
+        raise typer.BadParameter(str(e))
     typer.echo(
         f"\nimported {stats.imported} · skipped {stats.skipped} · sealed {stats.sealed} chunks"
     )
