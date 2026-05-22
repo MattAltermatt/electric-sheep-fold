@@ -200,17 +200,18 @@ def _make_sealed_zip(zip_path: Path, gen: int, entries: dict[int, bytes]) -> Non
 
 
 class TestIterCorpusFlames:
-    def test_walks_sealed_and_working(self, tmp_path: Path):
+    def test_walks_loose_and_sealed_transit(self, tmp_path: Path):
+        """v0.3: gen 244 carries a v0.2 transit zip (pre-unseal), gen 247 is loose."""
         corpus = tmp_path / "corpus"
         _make_sealed_zip(
             corpus / "244" / "00000-00099.zip",
             244,
             {1: GENOME_LINEAR, 2: ANIMATION},
         )
-        # Working dir for 247
-        working = corpus / "247" / "00000-09999"
-        working.mkdir(parents=True)
-        (working / "electricsheep.247.00050.flam3").write_bytes(GENOME_RICH)
+        # v0.3 loose: flat files in gen dir.
+        loose_gen = corpus / "247"
+        loose_gen.mkdir(parents=True)
+        (loose_gen / "electricsheep.247.00050.flam3").write_bytes(GENOME_RICH)
 
         flames = list(iter_corpus_flames(corpus))
         assert len(flames) == 3

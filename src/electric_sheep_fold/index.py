@@ -220,9 +220,10 @@ def _i(s: str) -> int:
 def iter_corpus_flames(corpus_root: Path):
     """Yield (gen, sheep_id, content_bytes, sealed) for every .flam3 in the corpus.
 
-    Walks both sealed zips AND working-dir chunks (in-progress live-track
-    fetches). Records carry a `sealed: bool` flag so agents can filter if
-    they only want frozen examples.
+    Walks loose ``corpus/{gen}/electricsheep.*.flam3`` files (v0.3 shape)
+    plus any surviving sealed ``NNNNN-NNNNN.zip`` (v0.2 transit, pre-unseal).
+    The ``sealed`` flag is kept for back-compat with downstream consumers
+    that filter on it; v0.3 records always carry ``sealed=False``.
     """
     if not corpus_root.exists():
         return
@@ -230,6 +231,7 @@ def iter_corpus_flames(corpus_root: Path):
         if not gen_dir.is_dir() or not gen_dir.name.isdigit():
             continue
         gen = int(gen_dir.name)
+        # v0.2 transit shape: sealed zip alongside / instead of loose files.
         for zip_path in sorted(gen_dir.glob("?????-?????.zip")):
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
@@ -237,14 +239,12 @@ def iter_corpus_flames(corpus_root: Path):
                     if not m:
                         continue
                     yield gen, int(m.group(2)), zf.read(name), True
-        for working in sorted(gen_dir.iterdir()):
-            if not working.is_dir() or not re.match(r"^\d{5}-\d{5}$", working.name):
+        # v0.3 native shape: loose flam3s in the gen dir.
+        for path in sorted(gen_dir.glob(f"electricsheep.{gen}.*.flam3")):
+            m = _FLAM3_RE.match(path.name)
+            if not m:
                 continue
-            for path in sorted(working.glob("electricsheep.*.flam3")):
-                m = _FLAM3_RE.match(path.name)
-                if not m:
-                    continue
-                yield gen, int(m.group(2)), path.read_bytes(), False
+            yield gen, int(m.group(2)), path.read_bytes(), False
 
 
 def build_index(corpus_root: Path, out_dir: Path) -> dict:

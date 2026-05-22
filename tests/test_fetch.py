@@ -1,19 +1,22 @@
-"""Tests for electric_sheep_fold.fetch — v0.2 chunk-aware state machine."""
+"""Tests for electric_sheep_fold.fetch — v0.3 loose-corpus state machine."""
 from __future__ import annotations
 
-import zipfile
+import json
 from pathlib import Path
 
 import httpx
+import pytest
 
-from electric_sheep_fold.chunks import Chunk
 from electric_sheep_fold.fetch import ensure_corpus_initialized, fetch_all, fetch_range
-from electric_sheep_fold.layout import flam3_filename, sealed_zip_path, working_path
+from electric_sheep_fold.layout import flam3_filename, flam3_path
 from electric_sheep_fold.manifest import MissingSet
 
 
 def _build_client(handler):
     return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+FLAM3 = b'<?xml version="1.0"?><flame name="t"><xform weight="1" linear="1"/></flame>'
 
 
 class TestEnsureCorpusInitialized:
@@ -34,11 +37,8 @@ class TestEnsureCorpusInitialized:
         assert attr.read_text(encoding="utf-8") == "custom"
 
 
-FLAM3 = b'<?xml version="1.0"?><flame name="t"><xform weight="1" linear="1"/></flame>'
-
-
-class TestFetchRange200:
-    def test_writes_into_working_dir(self, tmp_path: Path):
+class TestFetchWritesFlat:
+    def test_fetched_file_lands_at_flat_loose_path(self, tmp_path: Path):
         def handler(req):
             return httpx.Response(200, content=FLAM3)
         client = _build_client(handler)
@@ -47,9 +47,27 @@ class TestFetchRange200:
             client=client, delay=0, jitter=0,
         )
         assert stats.downloaded == 1
-        dest = working_path(248, 100, tmp_path)
+        assert stats.files_written == 1
+        dest = flam3_path(248, 100, tmp_path)
+        # v0.3 invariant: corpus/{gen}/electricsheep.{gen}.{id}.flam3, no chunk subdir.
+        assert dest == tmp_path / "248" / "electricsheep.248.00100.flam3"
         assert dest.exists()
         assert dest.read_bytes() == FLAM3
+
+    def test_no_chunk_subdir_created(self, tmp_path: Path):
+        def handler(req):
+            return httpx.Response(200, content=FLAM3)
+        client = _build_client(handler)
+        fetch_range(
+            gen=248, start=100, end=101, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        gen_root = tmp_path / "248"
+        # No NNNNN-NNNNN chunk subdir, no sealed zip.
+        chunk_dirs = [p for p in gen_root.iterdir() if p.is_dir()]
+        assert chunk_dirs == []
+        zips = list(gen_root.glob("*.zip"))
+        assert zips == []
 
 
 class TestFetchRange404:
@@ -82,14 +100,14 @@ class TestFetchRange5xx:
         assert not ms.contains(200)
 
 
-class TestSkipWorkingDirHit:
-    def test_no_network_when_in_working_dir(self, tmp_path: Path):
+class TestSkipLocalHit:
+    def test_no_network_when_loose_file_exists(self, tmp_path: Path):
         calls = {"n": 0}
         def handler(req):
             calls["n"] += 1
             return httpx.Response(200, content=b"never")
-        # Pre-populate working dir
-        dest = working_path(248, 100, tmp_path)
+        # Pre-populate loose flam3 directly at v0.3 path.
+        dest = flam3_path(248, 100, tmp_path)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(b"already")
         client = _build_client(handler)
@@ -99,123 +117,6 @@ class TestSkipWorkingDirHit:
         )
         assert stats.skip_local == 1
         assert calls["n"] == 0
-
-
-class TestSkipSealedZipHit:
-    def test_no_network_when_in_sealed_zip(self, tmp_path: Path):
-        # Pre-create a sealed zip containing sheep 100
-        zip_path = sealed_zip_path(248, 0, 10_000, tmp_path)
-        zip_path.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(zip_path, "w") as zf:
-            zf.writestr("MANIFEST.csv", "id\n100\n")
-            zf.writestr(flam3_filename(248, 100), b"sealed-content")
-        calls = {"n": 0}
-        def handler(req):
-            calls["n"] += 1
-            return httpx.Response(200, content=b"never")
-        client = _build_client(handler)
-        stats = fetch_range(
-            gen=248, start=100, end=101, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 1
-        assert calls["n"] == 0
-
-
-class TestSkipWholeGenZipHit:
-    """v0.2.2 regression guard: sheep_id in a wider whole-gen zip
-    (not chunk_for-derived) must also skip-without-network."""
-
-    def test_no_network_when_in_whole_gen_zip(self, tmp_path: Path):
-        # Whole-gen zip spans [0, 30000) — much wider than chunk_for(100) = (0, 10000).
-        # File is named for its range; chunk_for-derived sealed_zip_path
-        # would look at 00000-09999.zip which doesn't exist.
-        gen_root = tmp_path / "247"
-        gen_root.mkdir(parents=True)
-        whole_gen_zip = gen_root / "00000-29999.zip"
-        with zipfile.ZipFile(whole_gen_zip, "w") as zf:
-            zf.writestr("MANIFEST.csv", "id\n100\n25000\n")
-            zf.writestr(flam3_filename(247, 100), b"in-whole-gen")
-            zf.writestr(flam3_filename(247, 25000), b"in-whole-gen")
-        calls = {"n": 0}
-        def handler(req):
-            calls["n"] += 1
-            return httpx.Response(200, content=b"never")
-        client = _build_client(handler)
-        # Probe both a low id (would be in 00000-09999 chunk) and high (20000-29999)
-        stats = fetch_range(
-            gen=247, start=100, end=101, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 1
-        assert calls["n"] == 0
-        stats = fetch_range(
-            gen=247, start=25000, end=25001, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 1
-        assert calls["n"] == 0
-
-
-class TestSkipSealedRange:
-    """v0.2.4 regression guard: ids inside a sealed zip's [start, end)
-    must skip-without-network even when ABSENT from the zip namelist.
-
-    Reproduces the 2026-05-22 corpus bug: live-gen seals (247: 9006/30000
-    in namelist; 248: 2926/20000) had a sparse missing.txt, so gap-ids
-    fell through to network. Range-trust honors the seal as the authority
-    over its claimed range; the namelist is no longer the skip primitive."""
-
-    def test_sparse_sealed_zip_skips_gap_ids(self, tmp_path: Path):
-        # Zip claims [0, 30000) but only id 100 is in the namelist —
-        # mirrors the corpus/247/00000-29999.zip shape. Gap-id 5000 must
-        # still skip without touching the network.
-        gen_root = tmp_path / "247"
-        gen_root.mkdir(parents=True)
-        sparse_zip = gen_root / "00000-29999.zip"
-        with zipfile.ZipFile(sparse_zip, "w") as zf:
-            zf.writestr("MANIFEST.csv", "id\n100\n")
-            zf.writestr(flam3_filename(247, 100), b"the-one-in-namelist")
-        calls = {"n": 0}
-        def handler(req):
-            calls["n"] += 1
-            return httpx.Response(200, content=b"never")
-        client = _build_client(handler)
-        stats = fetch_range(
-            gen=247, start=5000, end=5001, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 1
-        assert calls["n"] == 0
-        # Sweep a small window inside the sealed range — all gap-ids.
-        stats = fetch_range(
-            gen=247, start=29990, end=30000, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 10
-        assert calls["n"] == 0
-
-    def test_ids_outside_sealed_range_still_fetch(self, tmp_path: Path):
-        # Same sparse zip — but id 30000 is OUTSIDE [0, 30000) and must
-        # still hit the network.
-        gen_root = tmp_path / "247"
-        gen_root.mkdir(parents=True)
-        sparse_zip = gen_root / "00000-29999.zip"
-        with zipfile.ZipFile(sparse_zip, "w") as zf:
-            zf.writestr("MANIFEST.csv", "id\n100\n")
-            zf.writestr(flam3_filename(247, 100), b"the-one-in-namelist")
-        calls = {"n": 0}
-        def handler(req):
-            calls["n"] += 1
-            return httpx.Response(404)
-        client = _build_client(handler)
-        stats = fetch_range(
-            gen=247, start=30000, end=30001, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-        assert stats.skip_local == 0
-        assert calls["n"] == 1
-        assert stats.newly_missing == 1
 
 
 class TestSkipKnownMissing:
@@ -238,71 +139,53 @@ class TestSkipKnownMissing:
         assert calls["n"] == 0
 
 
-class TestSealOnRangeCompletion:
-    def test_seals_chunk_when_range_completes(self, tmp_path: Path):
-        # Pre-populate missing.txt with everything in [0, 10) except 5
+class TestFetchResumeGuard:
+    """Daemon-resume guard: fetch_range must refuse to start if the corpus
+    has diverged from its post-unseal baseline (id count shrunk)."""
+
+    def test_diverged_unseal_log_blocks_fetch(self, tmp_path: Path):
+        # Record a verified baseline of (loose=10, missing=5) for gen 248,
+        # but stage the corpus with NO files at all → divergence.
         gen_root = tmp_path / "248"
         gen_root.mkdir(parents=True)
-        ms = MissingSet(gen_root / "missing.txt")
-        for sid in (0, 1, 2, 3, 4, 6, 7, 8, 9):
-            ms.add(sid)
-        ms.save_atomic()
+        (tmp_path / "_unseal-verified.json").write_text(json.dumps([
+            {
+                "gen": 248,
+                "loose_count": 10,
+                "missing_count": 5,
+                "source_sha256": "deadbeef",
+                "snapshot_path": "/nowhere/gen-248.zip",
+                "unsealed_at": "2026-05-22T00:00:00+00:00",
+            }
+        ]))
+        calls = {"n": 0}
         def handler(req):
+            calls["n"] += 1
             return httpx.Response(200, content=FLAM3)
         client = _build_client(handler)
+        with pytest.raises(RuntimeError, match="consistency check failed"):
+            fetch_range(
+                gen=248, start=0, end=1, corpus_root=tmp_path,
+                client=client, delay=0, jitter=0,
+            )
+        # And no requests went out.
+        assert calls["n"] == 0
+
+    def test_no_log_no_guard(self, tmp_path: Path):
+        # Empty / absent verified log → consistency check passes trivially.
+        def handler(req):
+            return httpx.Response(404)
+        client = _build_client(handler)
+        # Should NOT raise.
         fetch_range(
-            gen=248, start=5, end=6, corpus_root=tmp_path,
+            gen=248, start=0, end=1, corpus_root=tmp_path,
             client=client, delay=0, jitter=0,
         )
-        # Whole chunk 0..9 is now known; fetch_range's end-of-loop seal sweep should seal it
-        # NOTE: chunk size is 10000 in production, so this test relies on monkey-patching or
-        # falls back to verifying the working-dir state. We use a chunk-overriding test path:
-        # since fetch_range itself uses production CHUNK_SIZE, this test asserts the
-        # behavior in the typical case — write happened; sealing for the full-10k case is
-        # exercised by test_chunks.py:TestSeal and via a dedicated integration test below.
-        dest = working_path(248, 5, tmp_path)
-        assert dest.exists()
-
-
-class TestSealSweepFullChunkSize:
-    """Integration test: exercises the production CHUNK_SIZE=10000 seal path."""
-
-    def test_seals_full_chunk_and_cleans_working_dir(self, tmp_path: Path):
-        # Pre-populate missing.txt with every id in [0, 10000) except 5000
-        gen_root = tmp_path / "248"
-        gen_root.mkdir(parents=True)
-        ms = MissingSet(gen_root / "missing.txt")
-        for sid in range(0, 10_000):
-            if sid != 5000:
-                ms.add(sid)
-        ms.save_atomic()
-
-        def handler(req):
-            return httpx.Response(200, content=FLAM3)
-
-        client = _build_client(handler)
-        stats = fetch_range(
-            gen=248, start=5000, end=5001, corpus_root=tmp_path,
-            client=client, delay=0, jitter=0,
-        )
-
-        assert stats.chunks_sealed == 1
-
-        zip_path = sealed_zip_path(248, 0, 10_000, tmp_path)
-        assert zip_path.exists()
-
-        with zipfile.ZipFile(zip_path, "r") as zf:
-            names = zf.namelist()
-        assert "MANIFEST.csv" in names
-        assert flam3_filename(248, 5000) in names
-
-        # Working dir is cleaned up after seal
-        assert not (tmp_path / "248" / "00000-09999").exists()
 
 
 class TestMigrationRunsBeforeFetch:
     def test_v0_1_layout_migrated_on_first_fetch(self, tmp_path: Path):
-        # Pre-create a v0.1 bucket with a sheep, plus an empty missing.txt
+        # Pre-create a v0.1 bucket with a sheep.
         gen_root = tmp_path / "248"
         bucket = gen_root / "00xxx"
         bucket.mkdir(parents=True)
@@ -312,21 +195,20 @@ class TestMigrationRunsBeforeFetch:
             calls["n"] += 1
             return httpx.Response(404)
         client = _build_client(handler)
-        # Fetch a different id (200) — but migration should still have moved 100
+        # Fetch a different id — but migration should still have moved 100
+        # into the v0.3 loose path.
         fetch_range(
             gen=248, start=200, end=201, corpus_root=tmp_path,
             client=client, delay=0, jitter=0,
         )
-        # The v0.1 bucket is gone, the file is in the v0.2 working dir
         assert not bucket.exists()
-        assert working_path(248, 100, tmp_path).exists()
+        assert flam3_path(248, 100, tmp_path).exists()
 
 
 class TestFetchAll:
     def test_fetch_all_invokes_full_range(self, tmp_path: Path):
         seen_ids: list[int] = []
         def handler(req):
-            # Parse id out of the URL path: /gen/248/{id}/electricsheep...
             parts = req.url.path.split("/")
             seen_ids.append(int(parts[3]))
             return httpx.Response(404)

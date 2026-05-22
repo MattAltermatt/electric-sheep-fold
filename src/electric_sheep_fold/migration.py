@@ -1,20 +1,20 @@
-"""One-time v0.1 bucket → v0.2 chunk migration."""
+"""One-time v0.1 bucket → v0.3 loose-corpus migration.
+
+Pre-v0.2 corpora used per-1k-id "bucket" subdirs (``corpus/{gen}/NNxxx/``).
+This migration flattens any surviving v0.1 buckets into the v0.3 loose
+shape (``corpus/{gen}/electricsheep.{gen}.{id}.flam3``). The v0.2 chunked
+shape no longer appears anywhere in the working code path; the v0.2 →
+v0.3 transition is handled by :mod:`electric_sheep_fold.unseal`.
+"""
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
-from datetime import datetime, timezone
 from pathlib import Path
 
-from electric_sheep_fold.chunks import Chunk
-from electric_sheep_fold.layout import (
-    CHUNK_SIZE,
-    chunk_for,
-    flam3_filename,
-    remote_url,
-)
-from electric_sheep_fold.manifest import MissingSet
+from electric_sheep_fold.layout import flam3_path
 
 log = logging.getLogger(__name__)
 
@@ -31,11 +31,20 @@ def _list_v0_1_buckets(gen_root: Path) -> list[Path]:
     )
 
 
+def _atomic_move_into_place(src: Path, dest: Path) -> None:
+    """``os.replace`` src → dest via a same-dir .tmp, parent-mkdir-safe."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dest)
+    src.unlink()
+
+
 def migrate_v0_1_if_needed(corpus_root: Path, gen: int) -> bool:
-    """Detect v0.1 bucket layout under corpus/{gen}/ and convert to v0.2 chunks.
+    """Detect v0.1 bucket layout under corpus/{gen}/ and flatten to v0.3.
 
     Returns True if migration ran (something was moved); False if nothing to do.
-    Idempotent: second call is no-op.
+    Idempotent: second call is a no-op.
     """
     gen_root = corpus_root / str(gen)
     buckets = _list_v0_1_buckets(gen_root)
@@ -43,13 +52,6 @@ def migrate_v0_1_if_needed(corpus_root: Path, gen: int) -> bool:
         return False
 
     log.info("migrating %d v0.1 buckets under %s", len(buckets), gen_root)
-
-    missing = MissingSet(gen_root / "missing.txt")
-    missing.load()
-
-    touched_chunks: dict[tuple[int, int], Chunk] = {}
-    # Capture mtime before each file is moved so sealed MANIFEST.csv carries original provenance
-    mtimes: dict[tuple[int, int], datetime] = {}  # (gen, sheep_id) → utc datetime
 
     for bucket in buckets:
         for flam3 in bucket.glob("electricsheep.*.flam3"):
@@ -60,19 +62,12 @@ def migrate_v0_1_if_needed(corpus_root: Path, gen: int) -> bool:
             if file_gen != gen:
                 continue
             sheep_id = int(m.group(2))
-            content = flam3.read_bytes()
-
-            # Capture mtime BEFORE the move while the original path still exists
-            raw_mtime = flam3.stat().st_mtime
-            mtimes[(gen, sheep_id)] = datetime.fromtimestamp(raw_mtime, tz=timezone.utc)
-
-            start, end = chunk_for(sheep_id)
-            key = (start, end)
-            if key not in touched_chunks:
-                touched_chunks[key] = Chunk(
-                    gen=gen, start=start, end=end, corpus_root=corpus_root,
-                )
-            touched_chunks[key].add_flam3(sheep_id, content)
+            dest = flam3_path(gen, sheep_id, corpus_root)
+            if dest.exists():
+                # v0.3 file already in place — drop the bucket copy.
+                flam3.unlink()
+                continue
+            _atomic_move_into_place(flam3, dest)
 
         # Guard: only rmtree if bucket contains no non-flam3 user files
         non_flam3 = [
@@ -86,16 +81,5 @@ def migrate_v0_1_if_needed(corpus_root: Path, gen: int) -> bool:
             )
         else:
             shutil.rmtree(bucket, ignore_errors=False)
-
-    # Try to seal every touched chunk whose range is now complete
-    for chunk in touched_chunks.values():
-        if chunk.is_range_complete(missing):
-            chunk.seal(
-                missing,
-                source_url_for=lambda sid: remote_url(gen, sid),
-                fetched_at_for=lambda sid: mtimes.get(
-                    (chunk.gen, sid), datetime.now(tz=timezone.utc)
-                ),
-            )
 
     return True

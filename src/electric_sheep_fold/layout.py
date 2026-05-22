@@ -1,33 +1,16 @@
-"""Pure path / URL math for electric-sheep-fold. No I/O. (v0.2 chunks.)"""
+"""Pure path / URL math for electric-sheep-fold. No I/O. (v0.3 loose corpus.)"""
 from __future__ import annotations
 
 from pathlib import Path
 
 BASE_URL_DEFAULT = "http://v3d0.sheepserver.net"
 ARCHIVE_BASE_URL = "https://electricsheep.com/archives"
-CHUNK_SIZE = 10_000
 
 # Live gens — actively served by v3d0.sheepserver.net. `fetch` / `fetch-all`
 # refuse other gens to prevent accidental live-server probes for dead gens
-# (those use the archive scraper + `import --whole-gen` flow instead). Add
-# the next gen here when ES rolls over (Phase 14).
+# (those use the archive scraper + `import` flow instead). Add the next gen
+# here when ES rolls over.
 LIVE_GENS: frozenset[int] = frozenset({247, 248})
-
-
-def chunk_for(sheep_id: int) -> tuple[int, int]:
-    """Return (start, end) of the 10k chunk containing sheep_id, half-open.
-
-    0 → (0, 10000), 9999 → (0, 10000), 10000 → (10000, 20000), 40700 → (40000, 50000).
-    """
-    if sheep_id < 0:
-        raise ValueError(f"sheep_id must be non-negative, got {sheep_id}")
-    start = (sheep_id // CHUNK_SIZE) * CHUNK_SIZE
-    return start, start + CHUNK_SIZE
-
-
-def chunk_range_str(start: int, end: int) -> str:
-    """'00000-09999' for chunk (0, 10000) — used for filenames and dir names."""
-    return f"{start:05d}-{end - 1:05d}"
 
 
 def flam3_filename(gen: int, sheep_id: int) -> str:
@@ -35,22 +18,14 @@ def flam3_filename(gen: int, sheep_id: int) -> str:
     return f"electricsheep.{gen}.{sheep_id:05d}.flam3"
 
 
-def working_path(gen: int, sheep_id: int, corpus_root: Path) -> Path:
-    """Where a flam3 lives during its chunk's WORKING phase."""
-    start, end = chunk_for(sheep_id)
-    return (
-        corpus_root
-        / str(gen)
-        / chunk_range_str(start, end)
-        / flam3_filename(gen, sheep_id)
-    )
+def flam3_path(gen: int, sheep_id: int, corpus_root: Path) -> Path:
+    """Where a flam3 lives in the v0.3 loose corpus: corpus/{gen}/electricsheep.{gen}.{id}.flam3."""
+    return corpus_root / str(gen) / flam3_filename(gen, sheep_id)
 
 
-def sealed_zip_path(
-    gen: int, chunk_start: int, chunk_end: int, corpus_root: Path
-) -> Path:
-    """Path of the sealed .zip for a given chunk."""
-    return corpus_root / str(gen) / f"{chunk_range_str(chunk_start, chunk_end)}.zip"
+def release_zip_path(gen: int, out_dir: Path) -> Path:
+    """Path of the consumer-facing release artifact for one gen."""
+    return out_dir / f"gen-{gen}.zip"
 
 
 def remote_url(gen: int, sheep_id: int, base: str = BASE_URL_DEFAULT) -> str:
