@@ -1,5 +1,13 @@
 # CLAUDE.md — electric-sheep-fold
 
+## Commands
+
+```sh
+uv pip install -e ".[dev]"         # editable install + pytest
+pytest -q                          # full test suite (~150 tests, no real network)
+sheep-fold --help                  # CLI entry — fetch / fetch-all / import / seal / status
+```
+
 ## Conventions
 
 - **Default branch:** `main`.
@@ -38,8 +46,10 @@ These must NOT be violated without a deliberate spec update:
   3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
      `_missing_404.txt`, GET `spex`. Accept only valid flam3 (see
      `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
-  Output → `sheep-fold import` → force-seal partial chunks. Scripts can be
-  deleted once each gen is fully preserved.
+  Output → `sheep-fold import --whole-gen` (auto-seals as one whole-gen zip
+  per the v0.2.1 policy). All eight dead flam3 gens listed above are fully
+  preserved + sealed as of 2026-05-21 (see `CHANGELOG.md` for counts); the
+  preservation scripts are now quiescent and can be removed if needed.
 - **MPG-only generations are permanently out of scope.** `old`, `very-old`,
   and gen `23` are video-only on the archive — content-addressed by MD5 hash
   under `archives/{old,very-old}/...` (not `generation-N/`), no `spex`
