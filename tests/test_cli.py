@@ -106,3 +106,36 @@ class TestImportSmoke:
         assert result.exit_code == 0
         assert "imported 1" in result.output
         assert working_path(248, 100, corpus).exists()
+
+
+class TestLiveGenGuard:
+    """fetch / fetch-all refuse gens not in LIVE_GENS (247, 248)."""
+
+    @pytest.mark.parametrize("dead_gen", [165, 169, 191, 198, 242, 243, 244, 245])
+    def test_fetch_rejects_dead_gen(self, tmp_path: Path, dead_gen: int):
+        result = runner.invoke(
+            app,
+            ["fetch", "0..1", "--gen", str(dead_gen), "--corpus", str(tmp_path)],
+        )
+        assert result.exit_code != 0
+        assert "not a live gen" in result.output
+        assert "--whole-gen" in result.output
+
+    @pytest.mark.parametrize("dead_gen", [165, 244])
+    def test_fetch_all_rejects_dead_gen(self, tmp_path: Path, dead_gen: int):
+        result = runner.invoke(
+            app,
+            ["fetch-all", "--gen", str(dead_gen), "--upper", "10", "--corpus", str(tmp_path)],
+        )
+        assert result.exit_code != 0
+        assert "not a live gen" in result.output
+
+    @pytest.mark.parametrize("future_gen", [249, 300])
+    def test_fetch_rejects_future_gen_until_added(self, tmp_path: Path, future_gen: int):
+        """Forward-compat reminder: extending LIVE_GENS is a deliberate edit."""
+        result = runner.invoke(
+            app,
+            ["fetch", "0..1", "--gen", str(future_gen), "--corpus", str(tmp_path)],
+        )
+        assert result.exit_code != 0
+        assert "not a live gen" in result.output

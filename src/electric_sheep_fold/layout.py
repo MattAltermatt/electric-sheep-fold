@@ -7,6 +7,12 @@ BASE_URL_DEFAULT = "http://v3d0.sheepserver.net"
 ARCHIVE_BASE_URL = "https://electricsheep.com/archives"
 CHUNK_SIZE = 10_000
 
+# Live gens — actively served by v3d0.sheepserver.net. `fetch` / `fetch-all`
+# refuse other gens to prevent accidental live-server probes for dead gens
+# (those use the archive scraper + `import --whole-gen` flow instead). Add
+# the next gen here when ES rolls over (Phase 14).
+LIVE_GENS: frozenset[int] = frozenset({247, 248})
+
 
 def chunk_for(sheep_id: int) -> tuple[int, int]:
     """Return (start, end) of the 10k chunk containing sheep_id, half-open.

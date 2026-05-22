@@ -12,7 +12,7 @@ import typer
 from electric_sheep_fold.chunks import Chunk
 from electric_sheep_fold.fetch import fetch_all, fetch_range, make_client
 from electric_sheep_fold.importer import import_dir
-from electric_sheep_fold.layout import chunk_for, remote_url, sealed_zip_path
+from electric_sheep_fold.layout import LIVE_GENS, chunk_for, remote_url, sealed_zip_path
 from electric_sheep_fold.manifest import MissingSet
 
 app = typer.Typer(
@@ -38,6 +38,23 @@ def _parse_range(range_str: str) -> tuple[int, int]:
     return start, end
 
 
+def _require_live_gen(gen: int) -> None:
+    """Block fetch / fetch-all on gens not served by the live v3d0 server.
+
+    Dead-preserved gens (165 / 169 / 191 / 198 / 242 / 243 / 244 / 245) belong
+    to the archive scraper + `import --whole-gen` flow; running a live fetch
+    against them just wastes requests on a server that doesn't have them.
+    """
+    if gen not in LIVE_GENS:
+        allowed = ", ".join(str(g) for g in sorted(LIVE_GENS))
+        raise typer.BadParameter(
+            f"--gen {gen} is not a live gen; v3d0.sheepserver.net only serves "
+            f"{{{allowed}}}. For dead gens, use "
+            "`python scripts/scrape_archive_gen.py --gen N` followed by "
+            "`sheep-fold import <scrape-dir> --whole-gen`."
+        )
+
+
 def _parse_chunk_range(chunk_str: str) -> tuple[int, int]:
     m = CHUNK_RANGE_RE.match(chunk_str)
     if not m:
@@ -61,6 +78,7 @@ def fetch(
 ) -> None:
     """Download .flam3 files for sheep[start, end) into the chunked corpus."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    _require_live_gen(gen)
     start, end = _parse_range(range_str)
     with make_client() as client:
         stats = fetch_range(
@@ -84,6 +102,7 @@ def fetch_all_cmd(
 ) -> None:
     """Fetch the entire range [0, upper) for one gen. Resumable; idempotent."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    _require_live_gen(gen)
     with make_client() as client:
         stats = fetch_all(
             gen=gen, corpus_root=corpus, client=client,

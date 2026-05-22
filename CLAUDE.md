@@ -32,8 +32,10 @@ These must NOT be violated without a deliberate spec update:
     `scripts/preserve_archived_sheep.sh`). AWS-backed; aggregate ~few req/s
     is gentle. Never run live + archive at the same time — finish the live
     op first.
-- **Live-vs-dead gen scope:** the live tool (`sheep-fold`) is geared to gens
-  247 + 248 via v3d0. **Dead, flam3-bearing gens** (165, 169, 191, 198, 242,
+- **Live-vs-dead gen scope:** the live tool (`sheep-fold fetch` / `fetch-all`)
+  is hard-restricted to `LIVE_GENS = {247, 248}` in `layout.py`; any other
+  `--gen` value errors out with a hint to use the archive scraper. Extending
+  the set (e.g. when ES rolls gen 249) is a deliberate one-line edit. **Dead, flam3-bearing gens** (165, 169, 191, 198, 242,
   243, 244, 245) are preserved by `scripts/scrape_archive_gen.py` which runs
   three phases per gen against `electricsheep.com/archives`:
   1. **Time-page enumeration (optional)** — harvest ids linked from
