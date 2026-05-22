@@ -11,13 +11,20 @@ electric-sheep-fold is the tool that builds that corpus.
 
 ## What "done" looks like
 
-- A local `corpus/248/` directory containing a meaningful fraction of gen 248's
-  `.flam3` files, organized by thousand-bucket for git/filesystem friendliness.
-- A sticky `missing.txt` recording which sheep IDs were confirmed empty on the
-  server, so we never re-probe them.
-- `corpus/ATTRIBUTION.md` in place per the ES license's Sheep-Pack clause.
-- pyr3 consumes the corpus for parity testing (Phase 3 — outside electric-sheep-fold's
-  scope but the reason the tool exists).
+The corpus is built from two tracks:
+
+- **Live track** — `corpus/{247,248}/` filled from `v3d0.sheepserver.net` at
+  a polite 20s cadence, organized as sealed 10k-id `.zip` chunks.
+- **Preservation track** — `corpus/{165,169,191,198,242,243,244,245}/`
+  filled from the `electricsheep.com/archives` static mirror, sealed as
+  one whole-gen `.zip` per gen (the gen-id space is frozen, so synthetic
+  decade chunks would be bookkeeping for nothing).
+
+Every gen carries a sticky `missing.txt` so we never re-probe known-empty ids.
+`corpus/ATTRIBUTION.md` is in place per the ES license's Sheep-Pack clause.
+
+The end state is pyr3 consuming this corpus for parity testing (outside
+electric-sheep-fold's scope but the reason the tool exists).
 
 ## Politeness as a design constraint
 
@@ -32,14 +39,16 @@ The live ES server (v3d0, lighttpd 1.4.33) is volunteer infrastructure preservin
 - **Identifiable User-Agent** that names the project and links the repo, so server
   admins can reach us if our load is ever a problem.
 
-## What v0.2 changes
+## Storage shape
 
 v0.1 stored each `.flam3` as a loose file under per-thousand bucket dirs. v0.2
 chunks per generation into sealed-immutable 10k id-range `.zip` bundles, with a
 per-chunk `MANIFEST.csv` that captures the structural metadata (xform_count,
-variations, designer nick) needed by the future pyr3-facing index. New CLI
-verbs: `fetch-all` (entire gen, resumable), `import` (bulk-ingest existing
-local flames). The v0.1 → v0.2 migration is automatic on first run.
+variations, designer nick) needed by the future pyr3-facing index. v0.2.1 adds
+a whole-gen seal mode for dead-preserved gens — the archive-side gens are
+frozen, so one `00000-NNNNN.zip` per gen is the natural unit. CLI verbs:
+`fetch` / `fetch-all` (live track), `import [--whole-gen]` (preservation
+track). v0.1 → v0.2 migration is automatic on first run.
 
 ## License lineage
 
