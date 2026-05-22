@@ -3,23 +3,7 @@
 Ideas that aren't yet scheduled to a phase. Pull forward when one becomes
 load-bearing.
 
-## Phase 7 preservation order (smallest → largest)
-
-| Gen | Est. sheep | Scrape time @ 2s | Status |
-|---|---|---|---|
-| 242 | ~3,584 | ~2 hr | in flight (resumes at 476/3584 in `corpus/_scrape-242/`) |
-| 243 | ~6,080 | ~3.4 hr | queued |
-| 245 | ~12,096 | ~6.7 hr | queued (local 146 already imported) |
-| 191 | ~21,760 | ~12 hr | queued |
-| 244 | ~32,000 | ~17.7 hr | queued (local 21,051 already imported) |
-| 198 | ~31,936 | ~17.7 hr | queued |
-| 247-archived | ~65,024 | ~36 hr | queued (live track via v3d0 also feeds 247) |
-| 248-archived | ~40k est | ~22 hr | live track is the primary source |
-| 165 | ? (no `time/`) | ? | needs different probe |
-| 169 | ? (no `time/`) | ? | needs different probe |
-| 23 | ? (different path) | ? | uses `generation-23/page/`, no `best/` |
-| old / very-old | ? | ? | special collections, different URL structure |
-
+## Tooling / ingest
 
 - **Sidecar files** — `--include-sidecars` flag if pyr3 ever needs `state.fsd` /
   `memory` / `spex`.
