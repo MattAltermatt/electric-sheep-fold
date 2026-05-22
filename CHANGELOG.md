@@ -1,6 +1,61 @@
 # 📝 Changelog
 
-## Unreleased — 2026-05-21 (live)
+## v0.2.1 — 2026-05-21
+
+### Phase 9 — dead-gen whole-zip policy
+
+Dead-preserved gens (sourced from the `electricsheep.com/archives` static
+mirror) now seal as a single whole-gen zip spanning `[0, max_observed_id + 1)`
+instead of synthetic 10k-id decade chunks. Live-preserved gens (247 / 248,
+sourced via `v3d0.sheepserver.net`) keep their 10k-chunk layout — the gen's
+biography is encoded in the chunk shape itself, and a gen's shape is fixed
+at first preservation (no re-chunking when an upstream gen eventually dies).
+
+Spec:
+[`docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md`](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md).
+
+Code changes:
+- `layout.archive_url(gen, id)` — new helper for `electricsheep.com/archives`
+  source URLs (used by whole-gen seals; `remote_url` continues to point at
+  v3d0 for live-gen seals).
+- `importer.import_dir(..., whole_gen=True, gen=N)` — new mode that scans the
+  scrape dir for flam3s + `_missing_404.txt`, computes `max_id`, copies the
+  missing set into `corpus/{gen}/missing.txt`, imports all flam3s into a
+  single `Chunk(0, max_id+1)`, and seals.
+- `sheep-fold import --whole-gen [--gen N]` — CLI flag plumbing; `gen` is
+  inferred from filenames when omitted (errors if src has mixed gens).
+- `CLAUDE.md` chunk-size invariant amended to describe the live/dead split.
+
+13 importer tests + 3 layout tests added (148 total green).
+
+### Phase 8b — all dead flam3 gens preserved + sealed
+
+Eight dead flam3-bearing gens fully preserved + sealed under the v0.2.1
+whole-gen policy. Every id in `[0, max_observed_id]` is accounted for as
+either a `.flam3` on disk or a `missing.txt` entry:
+
+| Gen | flam3s | sticky-404s | sealed zip            | size  |
+|-----|-------:|------------:|-----------------------|------:|
+| 165 |    998 |         100 | `00000-01097.zip`     | 0.6MB |
+| 169 | 21,745 |         100 | `00000-21844.zip`     | 15.4MB |
+| 191 | 21,743 |         107 | `00000-21849.zip`     | 20.9MB |
+| 198 | 31,836 |         191 | `00000-32026.zip`     | 89.6MB |
+| 242 |  3,388 |         306 | `00000-03693.zip`     | 14.2MB |
+| 243 |  5,266 |      12,521 | `00000-17786.zip`     | 15.8MB |
+| 244 | 33,594 |      52,982 | `00000-86575.zip`     | 204.5MB |
+| 245 | 11,950 |         249 | `00000-12198.zip`     | 108.6MB |
+| **Σ** | **130,520** | **66,556** | — | **~470MB** |
+
+Gen 244 surfaced exactly one sweep-gap (id 67084 — no flam3, no missing
+entry); a single HEAD probe against the archive returned 404, added to
+`missing.txt`, re-seal completed cleanly. All MANIFEST.csv rows carry archive
+`source_url`s; zero XML parse failures across all eight gens.
+
+After seal, the raw `_scrape-{165,169,191,198,242,243,244,245}/` working
+directories were removed — every flam3 is fully captured in the sealed zip
+with provenance, so the raw dirs were ~1.8GB of redundant data. The
+`_scrape-247/` symlink tree is preserved pending Phase 10's live-track
+reconciliation.
 
 ### Project rename: `electric-sheep-fold` → `electric-sheep-fold`
 
