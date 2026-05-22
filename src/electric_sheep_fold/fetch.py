@@ -6,7 +6,6 @@ import os
 import random
 import re
 import time
-import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import resources
@@ -58,31 +57,36 @@ def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
-_FLAM3_ZIP_RE = re.compile(r"^electricsheep\.\d+\.(\d{5})\.flam3$")
+_SEALED_ZIP_NAME_RE = re.compile(r"^(\d{5})-(\d{5})\.zip$")
 
 
-def _known_ids_in_gen_zips(gen_root: Path, gen: int) -> set[int]:
-    """Return all sheep_ids present in any sealed zip under gen_root.
+def _sealed_ids_in_gen(gen_root: Path, gen: int) -> set[int]:
+    """Return every sheep_id within any sealed zip's [start, end) for `gen`.
 
-    Walks every `NNNNN-NNNNN.zip` in the gen directory regardless of its
-    range — supports both per-chunk (v0.2 / v0.2.1 live) and whole-gen
-    (v0.2.1 dead / v0.2.2+) sealed-zip layouts. Filters by gen prefix
-    inside the filename so a misplaced zip can't pollute the result.
+    Range-trust semantics: each sealed zip's filename-claimed range is
+    authoritative. Once `corpus/{gen}/NNNNN-MMMMM.zip` exists, ids in
+    [NNNNN, MMMMM+1) are considered decided — present in the zip namelist
+    OR provably absent — and must skip without network. This honors the
+    CLAUDE.md invariant "range-completion is the seal trigger": the seal
+    is the commitment, the namelist + missing.txt are the bookkeeping.
+
+    Filename uses end-1 inclusive (matches layout.chunk_range_str), so the
+    half-open range is `[int(m1), int(m2) + 1)`. The `gen` argument is
+    intentionally unused — gen scoping comes from `gen_root` — but kept
+    in the signature for call-site readability.
     """
-    known: set[int] = set()
+    del gen  # gen_root already scopes; arg preserved for readability
+    decided: set[int] = set()
     if not gen_root.exists():
-        return known
-    flam3_re = re.compile(rf"^electricsheep\.{gen}\.(\d{{5}})\.flam3$")
+        return decided
     for zp in gen_root.glob("?????-?????.zip"):
-        try:
-            with zipfile.ZipFile(zp, "r") as zf:
-                for name in zf.namelist():
-                    m = flam3_re.match(name)
-                    if m:
-                        known.add(int(m.group(1)))
-        except zipfile.BadZipFile:
-            log.warning("skipping malformed zip %s", zp)
-    return known
+        m = _SEALED_ZIP_NAME_RE.match(zp.name)
+        if not m:
+            log.warning("skipping unparseable sealed zip name %s", zp)
+            continue
+        start, end_inclusive = int(m.group(1)), int(m.group(2))
+        decided.update(range(start, end_inclusive + 1))
+    return decided
 
 
 def fetch_range(
@@ -113,11 +117,14 @@ def fetch_range(
     stats = FetchStats()
     touched_chunks: dict[tuple[int, int], Chunk] = {}
 
-    # Build the set of sheep_ids present in ANY sealed zip in gen_root, so
-    # the skip-check works under both per-chunk and whole-gen layouts. The
-    # chunk_for-derived `chunk.contains_id` only checks ONE chunk's zip
-    # path, which misses ids stored in a wider whole-gen zip (v0.2.2+).
-    known_in_zips = _known_ids_in_gen_zips(gen_root, gen)
+    # Range-trust skip set: every id inside any sealed zip's [start, end)
+    # is decided (in zip OR known-absent). The chunk_for-derived
+    # `chunk.contains_id` only inspects ONE chunk's zip path AND only its
+    # namelist, missing both wider whole-gen zips (v0.2.2+) and sparse
+    # ranges (where the zip claims [0, 30000) but only N << 30000 ids are
+    # in the namelist). Range-trust covers both. See CLAUDE.md invariant
+    # "range-completion is the seal trigger".
+    sealed_ids = _sealed_ids_in_gen(gen_root, gen)
 
     # Cache chunks across the loop to avoid re-stat'ing the zip every id
     def chunk_for_id_cached(sheep_id: int) -> Chunk:
@@ -131,7 +138,7 @@ def fetch_range(
     for sheep_id in range(start, end):
         chunk = chunk_for_id_cached(sheep_id)
 
-        if sheep_id in known_in_zips or chunk.contains_id(sheep_id):
+        if sheep_id in sealed_ids or chunk.contains_id(sheep_id):
             log.info("skip-local %d.%05d", gen, sheep_id)
             stats.skip_local += 1
             continue

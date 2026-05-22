@@ -1,5 +1,37 @@
 # 📝 Changelog
 
+## v0.2.4 — 2026-05-22
+
+### Phase 11d — range-trust fetch skip-check
+
+Bug surfaced after the v0.2.2 manual collapse-to-whole-gen ops left two
+sealed live-gen zips violating the `is_range_complete` invariant:
+`corpus/247/00000-29999.zip` claims `[0, 30000)` but only 9006 ids are in
+its namelist; `corpus/248/00000-19999.zip` claims `[0, 20000)` with 2926.
+`missing.txt` for both gens was sparse (15 + 6163 in-range entries vs.
+~21k + ~11k gaps). v0.2.3's `_known_ids_in_gen_zips` skipped on namelist
+hits, so the ~32k gap-ids fell through to network — `fetch-all` would
+re-probe them at 20s cadence (~5d + ~2.5d wasted) before reaching new
+frontier ids.
+
+Fix: replace `_known_ids_in_gen_zips` with `_sealed_ids_in_gen`. The new
+helper treats each sealed zip's filename-claimed `[start, end)` as
+authoritative — no need to crack the zip open. This honors the CLAUDE.md
+invariant *"range-completion is the seal trigger: a chunk seals when
+every id in `[start, end)` has known status"*: the seal IS the
+commitment over its range, namelist + `missing.txt` are bookkeeping
+beneath it. Once sealed, decided.
+
+Tooling-only patch; no corpus change. The v0.2.2 Release assets stay
+current. Two new regression tests (`TestSkipSealedRange`); 175/175 green
+(was 173). Cause forensics: the bad seals trace to a manual v0.2.2 ops
+step (the commit only touched docs); the in-code seal paths
+(`Chunk.seal` + `fetch_range`'s seal sweep + `_import_whole_gen`) all
+gate on `is_range_complete` and remain correct. The "embed MISSING.csv
+in sealed zips" idea moved from this patch's Phase 2 to a standalone
+BACKLOG entry as the structural defense against future manual-ops
+sparsity.
+
 ## v0.2.3 — 2026-05-21
 
 ### Phase 11c — fetch skip-check supports whole-gen layout

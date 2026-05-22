@@ -5,23 +5,19 @@ load-bearing.
 
 ## Tooling / ingest
 
-- **🩹 Sticky-404 set lost for live-gen pre-seeded ranges (2026-05-22).** Sealed
-  whole-gen zips `corpus/247/00000-29999.zip` (9006 flames) and
-  `corpus/248/00000-19999.zip` (2926 flames) violate the `is_range_complete`
-  invariant: their `missing.txt` only accounts for 15 and 6163 ids in-range
-  respectively, leaving ~20979 (247) + ~10911 (248) gap-ids that fetch-all now
-  re-probes at 20s cadence (~5d + ~2.5d wasted). **Symptom (observed 2026-05-22):**
-  `scripts/resume_live_fetch.sh` hits network on 247.00036 (404) instead of
-  skip-known-missing. **Hypothesis (unverified):** seal was done from
-  pre-seeded local archive (`/Users/matt/dev/sheep/247`) via a path that didn't
-  populate or enforce missing.txt for [0, zip_end). **Next phase:** verify
-  hypothesis against current code first. Two fixes (sequenced):
-  1. *Back-fill migration* — for each sealed zip, compute
-     `set(range(start, end)) - set(zip_contents)` and add to `missing.txt`.
-     One-time sub-second per gen. Conservative (assumes gaps = 404s).
-  2. *Embed MISSING in zip* — extend seal to write `MISSING.csv` alongside
-     `MANIFEST.csv` inside the zip; load it at fetch-start. Removes the
-     seal-and-purge failure mode entirely. Pairs with the back-fill above.
+- **📦 Embed MISSING.csv in sealed zips.** Extend `Chunk.seal()` to write
+  `MISSING.csv` alongside `MANIFEST.csv` listing every id in `[start, end)`
+  that isn't a `.flam3` member (one row per id, plus `reason` /
+  `recorded_at` columns mirroring the working missing.txt entries). Pure
+  additive seal-format change; backwards-compatible (older consumers
+  ignore the extra entry). Provenance value for the v0.3+ pyr3-facing
+  index — lets agents answer "why is this id missing?" against the
+  sealed artifact alone, without needing a live `missing.txt`. Also
+  structural defense against future manual-ops bad seals like the v0.2.2
+  collapse that produced sparse `corpus/247/00000-29999.zip` +
+  `corpus/248/00000-19999.zip` (now handled by v0.2.4's range-trust
+  skip-check, but embedded MISSING would have prevented the lost-context
+  entirely).
 - **Sidecar files** — `--include-sidecars` flag if pyr3 ever needs `state.fsd` /
   `memory` / `spex`.
 - **Browsable gallery** — GitHub Pages thumbnail grid (downstream of Phase 4 —

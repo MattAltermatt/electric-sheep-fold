@@ -157,6 +157,67 @@ class TestSkipWholeGenZipHit:
         assert calls["n"] == 0
 
 
+class TestSkipSealedRange:
+    """v0.2.4 regression guard: ids inside a sealed zip's [start, end)
+    must skip-without-network even when ABSENT from the zip namelist.
+
+    Reproduces the 2026-05-22 corpus bug: live-gen seals (247: 9006/30000
+    in namelist; 248: 2926/20000) had a sparse missing.txt, so gap-ids
+    fell through to network. Range-trust honors the seal as the authority
+    over its claimed range; the namelist is no longer the skip primitive."""
+
+    def test_sparse_sealed_zip_skips_gap_ids(self, tmp_path: Path):
+        # Zip claims [0, 30000) but only id 100 is in the namelist —
+        # mirrors the corpus/247/00000-29999.zip shape. Gap-id 5000 must
+        # still skip without touching the network.
+        gen_root = tmp_path / "247"
+        gen_root.mkdir(parents=True)
+        sparse_zip = gen_root / "00000-29999.zip"
+        with zipfile.ZipFile(sparse_zip, "w") as zf:
+            zf.writestr("MANIFEST.csv", "id\n100\n")
+            zf.writestr(flam3_filename(247, 100), b"the-one-in-namelist")
+        calls = {"n": 0}
+        def handler(req):
+            calls["n"] += 1
+            return httpx.Response(200, content=b"never")
+        client = _build_client(handler)
+        stats = fetch_range(
+            gen=247, start=5000, end=5001, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.skip_local == 1
+        assert calls["n"] == 0
+        # Sweep a small window inside the sealed range — all gap-ids.
+        stats = fetch_range(
+            gen=247, start=29990, end=30000, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.skip_local == 10
+        assert calls["n"] == 0
+
+    def test_ids_outside_sealed_range_still_fetch(self, tmp_path: Path):
+        # Same sparse zip — but id 30000 is OUTSIDE [0, 30000) and must
+        # still hit the network.
+        gen_root = tmp_path / "247"
+        gen_root.mkdir(parents=True)
+        sparse_zip = gen_root / "00000-29999.zip"
+        with zipfile.ZipFile(sparse_zip, "w") as zf:
+            zf.writestr("MANIFEST.csv", "id\n100\n")
+            zf.writestr(flam3_filename(247, 100), b"the-one-in-namelist")
+        calls = {"n": 0}
+        def handler(req):
+            calls["n"] += 1
+            return httpx.Response(404)
+        client = _build_client(handler)
+        stats = fetch_range(
+            gen=247, start=30000, end=30001, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.skip_local == 0
+        assert calls["n"] == 1
+        assert stats.newly_missing == 1
+
+
 class TestSkipKnownMissing:
     def test_skip_when_in_missing(self, tmp_path: Path):
         gen_root = tmp_path / "248"
