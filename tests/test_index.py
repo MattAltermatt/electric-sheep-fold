@@ -72,6 +72,13 @@ class TestParseFlame:
         assert rec["supersample"] == 1
         assert rec["highlight_power"] == -1
         assert rec["negative_weight_xforms"] == 0
+        assert rec["xform_var_counts"] == [1, 1]
+        assert rec["max_var_per_xform"] == 1
+        assert rec["mean_var_per_xform"] == 1.0
+        assert rec["xforms_with_5plus_vars"] == 0
+        assert rec["final_xform_var_count"] is None
+        assert rec["has_post_affine_per_xform"] == [False, False]
+        assert rec["max_xform_weight"] == 1.0
 
     def test_rich_genome_pyr3_flags(self):
         rec = parse_flame(GENOME_RICH, 248, 200)
@@ -94,6 +101,74 @@ class TestParseFlame:
         assert "linear" in rec["variations"]
         assert "disc" in rec["variations"]
         assert "bubble" in rec["variations"]
+        # Per-xform shape: two regular xforms each with 1 variation;
+        # finalxform separate with its own count.
+        assert rec["xform_var_counts"] == [1, 1]
+        assert rec["max_var_per_xform"] == 1
+        assert rec["mean_var_per_xform"] == 1.0
+        assert rec["xforms_with_5plus_vars"] == 0
+        assert rec["final_xform_var_count"] == 1
+        # Only the second regular xform has a non-identity post.
+        assert rec["has_post_affine_per_xform"] == [False, True]
+        # Largest pick-weight across regular xforms is 0.7 (-0.3 + 0.7); final
+        # is excluded from the pick-weight max.
+        assert rec["max_xform_weight"] == 0.7
+
+
+GENOME_MULTI_VAR_PER_XFORM = (
+    # xform 1: 4 variations (linear, spherical, disc, bubble); pdj_a-d are PARAMS not vars
+    b'<flame name="dense" size="640 480">'
+    b'  <xform weight="0.5" coefs="1 0 0 1 0 0" linear="0.1" spherical="0.2" '
+    b'    disc="0.3" bubble="0.4" pdj_a="0.1" pdj_b="0.2"/>'
+    # xform 2: 5 variations (over the pyr3:gpu cap of 4)
+    b'  <xform weight="0.5" coefs="1 0 0 1 0 0" pdj="0.5" julia="0.5" '
+    b'    blade="0.5" cross="0.5" curl="0.5" pdj_c="0.3" pdj_d="0.4"/>'
+    # xform 3: 0 variations (purely affine)
+    b'  <xform weight="0.5" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+
+class TestPerXformVariationCounts:
+    """Validate the variation-density fields added for pyr3:gpu UBO sizing."""
+
+    def test_pdj_params_are_not_counted(self):
+        rec = parse_flame(GENOME_MULTI_VAR_PER_XFORM, 248, 1)
+        # xform 1: linear, spherical, disc, bubble (4); xform 2: pdj, julia,
+        # blade, cross, curl (5); xform 3: none.
+        assert rec["xform_var_counts"] == [4, 5, 0]
+
+    def test_aggregates_match_array(self):
+        rec = parse_flame(GENOME_MULTI_VAR_PER_XFORM, 248, 1)
+        assert rec["max_var_per_xform"] == 5
+        assert rec["mean_var_per_xform"] == 3.0
+        assert rec["xforms_with_5plus_vars"] == 1
+
+    def test_validation_invariants(self):
+        """Validation rules from the hand-off spec."""
+        rec = parse_flame(GENOME_MULTI_VAR_PER_XFORM, 248, 1)
+        assert len(rec["xform_var_counts"]) == rec["xform_count"]
+        # sum(xform_var_counts) >= len(variations[]) (sum counts each
+        # occurrence; variations[] dedupes the union)
+        assert sum(rec["xform_var_counts"]) >= len(rec["variations"])
+        assert rec["max_var_per_xform"] == max(rec["xform_var_counts"])
+        assert rec["mean_var_per_xform"] == round(
+            sum(rec["xform_var_counts"]) / len(rec["xform_var_counts"]), 2
+        )
+        assert rec["xforms_with_5plus_vars"] == sum(
+            1 for n in rec["xform_var_counts"] if n >= 5
+        )
+
+    def test_empty_xforms_safe(self):
+        # Degenerate genome with no xforms (extreme edge case).
+        empty = b'<flame name="empty" size="100 100"/>'
+        rec = parse_flame(empty, 248, 1)
+        assert rec["xform_count"] == 0
+        assert rec["xform_var_counts"] == []
+        assert rec["max_var_per_xform"] == 0
+        assert rec["mean_var_per_xform"] == 0.0
+        assert rec["xforms_with_5plus_vars"] == 0
+        assert rec["final_xform_var_count"] is None
 
     def test_animation_marked_with_frame_count(self):
         rec = parse_flame(ANIMATION, 244, 42746)

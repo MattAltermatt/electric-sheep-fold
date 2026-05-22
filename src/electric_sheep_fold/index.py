@@ -138,23 +138,60 @@ def _index_genome(rec: dict, root) -> dict:
     has_post_affine = False
     has_chaos = False
     negative_weight_xforms = 0
-    all_xforms = xforms + ([final] if final is not None else [])
-    for xf in all_xforms:
+    xform_var_counts: list[int] = []
+    has_post_affine_per_xform: list[bool] = []
+    max_xform_weight = 0.0
+    for xf in xforms:
         post = xf.get("post")
-        if post and post.strip() != IDENTITY_POST:
+        xf_has_post = bool(post and post.strip() != IDENTITY_POST)
+        has_post_affine_per_xform.append(xf_has_post)
+        if xf_has_post:
             has_post_affine = True
         if xf.get("chaos") is not None:
             has_chaos = True
         weight = _f(xf.get("weight", "1"))
+        if weight > max_xform_weight:
+            max_xform_weight = weight
         if weight < 0:
             negative_weight_xforms += 1
+        n_vars = 0
         for attr in xf.attrib:
             if attr in VARIATIONS:
                 variations.add(attr)
+                n_vars += 1
+        xform_var_counts.append(n_vars)
+
+    final_xform_var_count: int | None = None
+    if final is not None:
+        post = final.get("post")
+        if post and post.strip() != IDENTITY_POST:
+            has_post_affine = True
+        if final.get("chaos") is not None:
+            has_chaos = True
+        weight = _f(final.get("weight", "1"))
+        if weight < 0:
+            negative_weight_xforms += 1
+        n_final = 0
+        for attr in final.attrib:
+            if attr in VARIATIONS:
+                variations.add(attr)
+                n_final += 1
+        final_xform_var_count = n_final
+
     rec["has_post_affine"] = has_post_affine
     rec["has_chaos"] = has_chaos
     rec["negative_weight_xforms"] = negative_weight_xforms
     rec["variations"] = sorted(variations)
+    rec["xform_var_counts"] = xform_var_counts
+    rec["max_var_per_xform"] = max(xform_var_counts, default=0)
+    rec["mean_var_per_xform"] = (
+        round(sum(xform_var_counts) / len(xform_var_counts), 2)
+        if xform_var_counts else 0.0
+    )
+    rec["xforms_with_5plus_vars"] = sum(1 for n in xform_var_counts if n >= 5)
+    rec["final_xform_var_count"] = final_xform_var_count
+    rec["has_post_affine_per_xform"] = has_post_affine_per_xform
+    rec["max_xform_weight"] = max_xform_weight
     return rec
 
 
@@ -355,6 +392,39 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("|-------:|-------:|")
     for n in sorted(xc):
         L.append(f"| {n} | {xc[n]:,} |")
+    L.append("")
+
+    # Per-xform variation density (for pyr3:gpu MAX_VARIATIONS_PER_XFORM cap)
+    per_xform_hist: Counter[int] = Counter()
+    for r in genomes:
+        for n in r.get("xform_var_counts", []):
+            per_xform_hist[n] += 1
+        # Finalxform counted alongside (matches pyr3:gpu UBO sizing — final
+        # also gets allocated up to the cap).
+        fn = r.get("final_xform_var_count")
+        if fn is not None:
+            per_xform_hist[fn] += 1
+    total_xforms = sum(per_xform_hist.values())
+    genomes_with_5plus = sum(
+        1 for r in genomes
+        if r.get("xforms_with_5plus_vars", 0) > 0
+        or (r.get("final_xform_var_count") or 0) >= 5
+    )
+    L.append("## ⚙️ Per-xform variation density (pyr3:gpu UBO sizing signal)")
+    L.append("")
+    L.append(
+        "Histogram of variations-per-xform across all genomes (regular xforms "
+        "AND finalxform). Drives `MAX_VARIATIONS_PER_XFORM` cap decisions "
+        f"for pyr3:gpu. Genomes with ≥1 xform exceeding the current cap of "
+        f"4 variations: **{genomes_with_5plus:,}** / {tot_g:,}."
+    )
+    L.append("")
+    L.append("| Variations on xform | Xform count | % of all xforms |")
+    L.append("|--------------------:|------------:|----------------:|")
+    for n in sorted(per_xform_hist):
+        cnt = per_xform_hist[n]
+        pct = (100.0 * cnt / total_xforms) if total_xforms else 0.0
+        L.append(f"| {n} | {cnt:,} | {pct:.2f}% |")
     L.append("")
 
     # Animation frame-count bins

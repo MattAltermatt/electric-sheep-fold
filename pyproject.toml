@@ -1,6 +1,6 @@
 [project]
 name = "electric-sheep-fold"
-version = "0.2.4"
+version = "0.2.5"
 description = "Polite, idempotent mirror of Electric Sheep .flam3 genomes — companion to pyr3"
 readme = "README.md"
 requires-python = ">=3.11"

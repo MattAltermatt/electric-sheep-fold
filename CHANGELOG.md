@@ -1,5 +1,40 @@
 # 📝 Changelog
 
+## v0.2.5 — 2026-05-22
+
+### Phase 11e — per-xform variation-count index fields
+
+Triggered by **pyr3 v0.16** surfacing the GPU `MAX_VARIATIONS_PER_XFORM = 4`
+cap — the previous `variations[]` field was the genome-level UNION, which
+lost per-xform density. pyr3 needed the per-xform distribution to make a
+data-driven UBO-sizing decision for v0.17.
+
+`index.py` `_index_genome` now emits per-genome:
+
+- `xform_var_counts: [int]` — per-xform variation count (length matches
+  `xform_count`; finalxform excluded).
+- `max_var_per_xform`, `mean_var_per_xform`, `xforms_with_5plus_vars` —
+  derived aggregates.
+- `final_xform_var_count: int?` — finalxform's variation count if present,
+  else `null`.
+- `has_post_affine_per_xform: [bool]` — post-affine per-xform.
+- `max_xform_weight: float` — largest pick-weight across regular xforms.
+
+`INDEX.md` gains a *"Per-xform variation density"* section: full histogram +
+the headline number (genomes with ≥1 xform exceeding the current cap of 4).
+Two new `jq` recipes documented in the skill.
+
+**Corpus snapshot (143,133 flames · 41,110 genomes):** 7,105 genomes
+(~17.3%) have at least one xform exceeding the current pyr3:gpu cap of 4.
+Cap=5 → 97.9% coverage; cap=8 → 99.5%; cap=15 → 100% (max observed = 15).
+
+Hand-verified against `244/00000` (xform_var_counts = `[3, 5, 2]`). 179
+tests green (+4 new in `TestPerXformVariationCounts`).
+
+Tooling-only patch; no corpus change. The v0.2.2 Release assets stay
+current — re-uploading isn't necessary unless downstream tooling needs the
+new fields baked into a release zip.
+
 ## v0.2.4 — 2026-05-22
 
 ### Phase 11d — range-trust fetch skip-check
