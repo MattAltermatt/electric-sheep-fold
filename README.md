@@ -96,6 +96,7 @@ gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).
 
 - [VISION.md](VISION.md) — why this corpus exists
 - [ROADMAP.md](ROADMAP.md) — shipped phases + planned Releases
+- [docs/operations.md](docs/operations.md) — day-to-day runbook (daemon start/stop, release build, common gotchas)
 - [CHANGELOG.md](CHANGELOG.md) · [BACKLOG.md](BACKLOG.md) · [CLAUDE.md](CLAUDE.md)
 - Design specs:
   [v0.1](docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md) ·
