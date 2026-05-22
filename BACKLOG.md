@@ -3,6 +3,25 @@
 Ideas that aren't yet scheduled to a phase. Pull forward when one becomes
 load-bearing.
 
+## v0.3 polish (deferred from Phase F code review)
+
+- **🪶 Stream `.flam3` bytes in `release.py:_gather_gen_data`.** Currently
+  loads every flam3 into memory at once → peak RAM ~1.3 GB for gen 244
+  (86k files × ~15 KB). Fine on a 16 GB Mac but scales linearly with
+  corpus growth. Fix: pass file paths through to `zipfile.write(path,
+  arcname=...)` for loose-mode gens; keep the in-memory dict for the
+  sealed-transit fallback (already in RAM via `zf.read`). One-day task.
+- **🪶 Promote `MissingSet._ids` to a public `sorted_ids()` accessor.**
+  `release.py:130` reaches into the private attr with a noqa-SLF001
+  carve-out; a thin public method would survive future refactors of
+  the internal repr. Trivial.
+- **🪶 `verify_unseal_consistency` should compare id-sets, not just
+  counts.** Current check catches deletions (`actual_total <
+  expected_total`) but a `missing.txt` overwrite that ADDS bogus entries
+  while losing real ones could net out to the same total and slip
+  through. The v0.2.2 incident class was net-smaller (matches current
+  check) but a stronger diff would close the gap. Small.
+
 ## Tooling / ingest
 
 - **🗜️ Ship `.7z` Release artifact alongside `.zip`.** Deferred 2026-05-22

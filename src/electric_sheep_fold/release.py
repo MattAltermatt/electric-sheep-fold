@@ -79,10 +79,24 @@ def _gather_gen_data(
     if not gen_dir.is_dir():
         raise FileNotFoundError(f"gen dir not found: {gen_dir}")
 
+    sealed_zips = sorted(gen_dir.glob("?????-?????.zip"))
+    loose_paths = sorted(gen_dir.glob(f"electricsheep.{gen}.*.flam3"))
+    # Hybrid is a transient unseal-in-progress state; safe to read both
+    # (loose overrides sealed on id collision below) but worth flagging so
+    # an operator notices a half-finished migration before shipping a
+    # release built from mixed sources.
+    if sealed_zips and loose_paths:
+        log.warning(
+            "gen %d: hybrid shape (%d sealed zip(s) + %d loose .flam3) — "
+            "likely an interrupted unseal; run `sheep-fold unseal --gen %d` "
+            "to finish before building releases",
+            gen, len(sealed_zips), len(loose_paths), gen,
+        )
+
     records: dict[int, bytes] = {}
 
     # Sealed zips first; loose overrides on collision (hybrid case).
-    for zip_path in sorted(gen_dir.glob("?????-?????.zip")):
+    for zip_path in sealed_zips:
         with zipfile.ZipFile(zip_path, "r") as zf:
             for name in zf.namelist():
                 m = _FLAM3_RE.match(name)
@@ -90,7 +104,7 @@ def _gather_gen_data(
                     continue
                 records[int(m.group(2))] = zf.read(name)
 
-    for flam3_path in sorted(gen_dir.glob(f"electricsheep.{gen}.*.flam3")):
+    for flam3_path in loose_paths:
         m = _FLAM3_RE.match(flam3_path.name)
         if not m:
             continue

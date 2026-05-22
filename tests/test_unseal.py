@@ -253,6 +253,45 @@ class TestSigKillRecovery:
         for sid in contents:
             assert (gen_dir / flam3_filename(165, sid)).exists()
 
+    def test_sigkill_between_d_and_e_recoverable(self, tmp_path: Path):
+        """Simulate SIGKILL after step (e)'s MANIFEST move but before the
+        COMMITTED marker write — the gen_dir already has MANIFEST.csv +
+        all flam3s, but the state marker still says VERIFIED. Resume must
+        not raise FileNotFoundError on the tmp manifest read.
+        """
+        corpus = tmp_path / "corpus"
+        _, contents = _populate_v0_2_gen(corpus, 165, [0, 1, 2], [])
+
+        gen_dir = corpus / "165"
+        tmp_dir = gen_dir / ".unseal-tmp"
+        tmp_dir.mkdir()
+        # Build the legitimate MANIFEST.csv + write it directly to gen_dir
+        # (simulating that step (e) ran but the COMMITTED marker write
+        # didn't land before SIGKILL). Tmp dir is empty.
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=MANIFEST_COLUMNS)
+        w.writeheader()
+        for sid in sorted(contents):
+            w.writerow(
+                extract_metadata(
+                    content=contents[sid],
+                    sheep_id=sid,
+                    source_url="sentinel://post-e-pre-marker",
+                    fetched_at=FETCHED_AT,
+                )
+            )
+        manifest_bytes = buf.getvalue().encode("utf-8")
+        (gen_dir / "MANIFEST.csv").write_bytes(manifest_bytes)
+        for sid in contents:
+            (gen_dir / flam3_filename(165, sid)).write_bytes(contents[sid])
+        (gen_dir / ".unseal-state").write_text("verified")
+
+        result = unseal_gen(165, corpus)
+        assert result.skipped is False
+        assert result.loose_count == 3
+        # MANIFEST.csv survived (no re-extract clobber).
+        assert (gen_dir / "MANIFEST.csv").read_bytes() == manifest_bytes
+
 
 # ----- Snapshot semantics ----------------------------------------------------
 

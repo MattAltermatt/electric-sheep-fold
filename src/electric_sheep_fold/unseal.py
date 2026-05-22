@@ -298,9 +298,15 @@ def _move_flam3s_into_gen_dir(tmp_dir: Path, gen_dir: Path, gen: int) -> int:
 
 
 def _move_manifest_into_gen_dir(tmp_dir: Path, gen_dir: Path) -> None:
-    """``os.replace`` MANIFEST.csv into gen_dir (preserves audit timestamps)."""
+    """``os.replace`` MANIFEST.csv into gen_dir (preserves audit timestamps).
+
+    Idempotent across the step (d)→(e) SIGKILL window: if a prior crash
+    moved MANIFEST already (dest present, src absent), this is a no-op.
+    """
     src = tmp_dir / "MANIFEST.csv"
     dest = gen_dir / "MANIFEST.csv"
+    if not src.exists() and dest.exists():
+        return
     os.replace(src, dest)
 
 
@@ -433,9 +439,15 @@ def unseal_gen(
     # because step (d) is per-file atomic and re-runnable (already-moved
     # files have no source to move from).
     if state == _STATE_VERIFIED:
-        # Read manifest BEFORE moving — once we move MANIFEST.csv in step
-        # (e) we lose access to row data for the loose_count.
-        manifest_rows = _read_manifest_rows(tmp_dir / "MANIFEST.csv")
+        # Step (d)→(e) is one VERIFIED segment: per-file flam3 moves are
+        # idempotent, and the MANIFEST move below is too. A SIGKILL anywhere
+        # in this block resumes cleanly because the manifest read tolerates
+        # already-moved state (tmp may be empty, gen_dir may already have it).
+        tmp_manifest = tmp_dir / "MANIFEST.csv"
+        gen_manifest = gen_dir / "MANIFEST.csv"
+        manifest_rows = _read_manifest_rows(
+            tmp_manifest if tmp_manifest.exists() else gen_manifest
+        )
         _move_flam3s_into_gen_dir(tmp_dir, gen_dir, gen)
 
         # ---- Step (e): audit MANIFEST.csv ---------------------------------
