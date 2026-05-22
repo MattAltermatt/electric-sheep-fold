@@ -4,7 +4,9 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 import time
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import resources
@@ -56,6 +58,33 @@ def _now() -> datetime:
     return datetime.now(tz=timezone.utc)
 
 
+_FLAM3_ZIP_RE = re.compile(r"^electricsheep\.\d+\.(\d{5})\.flam3$")
+
+
+def _known_ids_in_gen_zips(gen_root: Path, gen: int) -> set[int]:
+    """Return all sheep_ids present in any sealed zip under gen_root.
+
+    Walks every `NNNNN-NNNNN.zip` in the gen directory regardless of its
+    range — supports both per-chunk (v0.2 / v0.2.1 live) and whole-gen
+    (v0.2.1 dead / v0.2.2+) sealed-zip layouts. Filters by gen prefix
+    inside the filename so a misplaced zip can't pollute the result.
+    """
+    known: set[int] = set()
+    if not gen_root.exists():
+        return known
+    flam3_re = re.compile(rf"^electricsheep\.{gen}\.(\d{{5}})\.flam3$")
+    for zp in gen_root.glob("?????-?????.zip"):
+        try:
+            with zipfile.ZipFile(zp, "r") as zf:
+                for name in zf.namelist():
+                    m = flam3_re.match(name)
+                    if m:
+                        known.add(int(m.group(1)))
+        except zipfile.BadZipFile:
+            log.warning("skipping malformed zip %s", zp)
+    return known
+
+
 def fetch_range(
     gen: int,
     start: int,
@@ -84,6 +113,12 @@ def fetch_range(
     stats = FetchStats()
     touched_chunks: dict[tuple[int, int], Chunk] = {}
 
+    # Build the set of sheep_ids present in ANY sealed zip in gen_root, so
+    # the skip-check works under both per-chunk and whole-gen layouts. The
+    # chunk_for-derived `chunk.contains_id` only checks ONE chunk's zip
+    # path, which misses ids stored in a wider whole-gen zip (v0.2.2+).
+    known_in_zips = _known_ids_in_gen_zips(gen_root, gen)
+
     # Cache chunks across the loop to avoid re-stat'ing the zip every id
     def chunk_for_id_cached(sheep_id: int) -> Chunk:
         start_end = chunk_for(sheep_id)
@@ -96,7 +131,7 @@ def fetch_range(
     for sheep_id in range(start, end):
         chunk = chunk_for_id_cached(sheep_id)
 
-        if chunk.contains_id(sheep_id):
+        if sheep_id in known_in_zips or chunk.contains_id(sheep_id):
             log.info("skip-local %d.%05d", gen, sheep_id)
             stats.skip_local += 1
             continue

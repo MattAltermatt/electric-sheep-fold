@@ -122,6 +122,41 @@ class TestSkipSealedZipHit:
         assert calls["n"] == 0
 
 
+class TestSkipWholeGenZipHit:
+    """v0.2.2 regression guard: sheep_id in a wider whole-gen zip
+    (not chunk_for-derived) must also skip-without-network."""
+
+    def test_no_network_when_in_whole_gen_zip(self, tmp_path: Path):
+        # Whole-gen zip spans [0, 30000) — much wider than chunk_for(100) = (0, 10000).
+        # File is named for its range; chunk_for-derived sealed_zip_path
+        # would look at 00000-09999.zip which doesn't exist.
+        gen_root = tmp_path / "247"
+        gen_root.mkdir(parents=True)
+        whole_gen_zip = gen_root / "00000-29999.zip"
+        with zipfile.ZipFile(whole_gen_zip, "w") as zf:
+            zf.writestr("MANIFEST.csv", "id\n100\n25000\n")
+            zf.writestr(flam3_filename(247, 100), b"in-whole-gen")
+            zf.writestr(flam3_filename(247, 25000), b"in-whole-gen")
+        calls = {"n": 0}
+        def handler(req):
+            calls["n"] += 1
+            return httpx.Response(200, content=b"never")
+        client = _build_client(handler)
+        # Probe both a low id (would be in 00000-09999 chunk) and high (20000-29999)
+        stats = fetch_range(
+            gen=247, start=100, end=101, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.skip_local == 1
+        assert calls["n"] == 0
+        stats = fetch_range(
+            gen=247, start=25000, end=25001, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.skip_local == 1
+        assert calls["n"] == 0
+
+
 class TestSkipKnownMissing:
     def test_skip_when_in_missing(self, tmp_path: Path):
         gen_root = tmp_path / "248"

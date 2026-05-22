@@ -1,5 +1,28 @@
 # 📝 Changelog
 
+## v0.2.3 — 2026-05-21
+
+### Phase 11c — fetch skip-check supports whole-gen layout
+
+Bug surfaced after the v0.2.2 collapse to whole-gen: `fetch` / `fetch-all`
+used `chunk_for(sheep_id)` to derive the expected zip path
+(`corpus/{gen}/NNNNN-NNNNN.zip` at 10k boundaries) and only checked that
+specific path for the skip-without-network test. Under the whole-gen
+layout (a single wider zip like `00000-29999.zip`), the check missed ids
+already preserved and would re-probe v3d0 for them — rude to the live
+server and wasteful.
+
+Fix: new `_known_ids_in_gen_zips()` in `fetch.py` scans every sealed zip
+in `corpus/{gen}/` and builds a `set[int]` of preserved sheep_ids. The
+fetch skip-check unions this with the existing chunk-specific check
+(which still catches working-dir hits). Works under both per-chunk and
+whole-gen layouts. One new regression test (`TestSkipWholeGenZipHit`);
+173/173 tests green.
+
+Tooling-only patch; no corpus change. The v0.2.2 Release assets stay
+current. Version bump to make the wire surface (User-Agent string) reflect
+the fix.
+
 ## v0.2.2 — 2026-05-21
 
 ### Phase 11b — corpus-first pivot + Release-based distribution
