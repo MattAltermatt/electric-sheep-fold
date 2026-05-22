@@ -51,8 +51,27 @@ collapsed from dual chunked/whole-gen modes to one flat-write path.
 
 **Migration ran clean** against the live corpus: 143,307 loose files
 across 10 gens, 74,029 sticky-404 entries preserved. Live-fetch resume
-point captured at gen 247 / id 32085 (last recorded 404). Daemon will
-restart on the v0.3 code path post-merge.
+point captured at gen 247 / id 32085 (last recorded 404). Daemon
+restarted on the v0.3 code path.
+
+### Gap-id catchup (one-time, post-migration)
+
+v0.2.4's range-trust skip-check treated each sealed zip's filename-claimed
+range as authoritative ("the seal is the commitment over its range") even
+when the namelist + `missing.txt` didn't cover every id in that range. v0.3
+removes range-trust — `missing.txt` is the sole source of truth for
+known-empty ids. As a result, **31,822 gap-ids** in gens 247 + 248
+(~21k + ~11k respectively) that v0.2.4 treated as decided-without-record
+are now "unknown" to v0.3 and will be politely re-probed as the daemon
+sweeps. At the 20s live cadence this is ~7.4 days of background work,
+running concurrently with normal corpus extension. Each newly-confirmed
+404 atomically appends to `missing.txt`; each (hypothetical) 200 gets
+fetched. We accept the polite traffic cost to gain ground-truth state vs.
+inheriting v0.2's incomplete bookkeeping.
+
+The 8 dead gens (165, 169, 191, 198, 242–245) are tight — loose count +
+missing.txt count exactly equals the claimed range — so no catchup
+happens there.
 
 Spec: [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md).
 v0.2.5 is the off-machine fallback artifact (final sealed-shape snapshot).
