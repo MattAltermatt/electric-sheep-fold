@@ -5,19 +5,26 @@ load-bearing.
 
 ## Tooling / ingest
 
-- **🗜️ Ship `.tar.xz` Release artifact alongside `.zip`.** Deferred 2026-05-22
-  pending real demand. Benchmark on gen 244 (943 MB uncompressed): current
-  DEFLATE-9 zip = 214 MB; `tar.xz` preset-9e = 58 MB (**−73%**). Whole-corpus
-  projection: ~525 MB → ~140 MB. Solid LZMA2 dedupes across the 33k+ entries'
-  shared XML scaffolding / palette structure, which per-entry DEFLATE can't
-  see. **Why not in-tree:** in-tree zips are hot-path random-access for
-  `sheep-fold fetch / import / index` AND agentic `jq` queries; solid
-  archives require decompressing up to the target entry. Keep `.zip` in
-  tree, add `.tar.xz` only as a Release-distribution-only artifact for
-  fresh-install downloaders. Pull forward when someone complains about
-  download size. *Rejected sibling:* LZMA-in-zip is portable to bsdtar /
-  Finder but **silently skips on Info-ZIP `unzip` 6.00** (default on macOS
-  + most Linux), so a non-starter for zip-format compatibility claims.
+- **🗜️ Ship `.7z` Release artifact alongside `.zip`.** Deferred 2026-05-22
+  pending v0.3 ship. User-confirmed 7z extraction works fine on current
+  macOS (Tahoe / Darwin 25) via native Archive Utility — the old
+  "consumer needs Keka" objection was stale. User-reported ratio: 517 MB
+  flam3 corpus → 5.4 MB (~96× compression). Subsumes the prior tar.xz
+  entry (7z has cleaner cross-platform tooling story + same LZMA2
+  underneath). **Why deferrable:** under v0.3 the on-disk corpus is loose
+  `.flam3` files — random-access concerns no longer apply to the release
+  artifact (which is download-and-extract only). Solid 7z's lack of
+  random read inside the archive is irrelevant when the consumer's first
+  step is `7zz x`. **Shape options when pulled forward:**
+  - **A · Mega-bundle only.** Keep per-gen `gen-{N}.zip` (granular,
+    universally supported); add `corpus-all.7z` alongside `corpus-all.zip`.
+    Lowest-friction; serves bandwidth-conscious whole-corpus downloaders.
+  - **B · Multi-format per gen.** Ship both `gen-{N}.zip` and `gen-{N}.7z`
+    per gen. Double upload time + storage but consumers pick their poison.
+  - **C · 7z as default.** All artifacts `.7z`; `.zip` becomes an optional
+    legacy path. Smallest releases, highest tooling assumption.
+  Pull forward when corpus growth makes the zip download size painful
+  (e.g. live gen 247 cresting 50k+ sheep).
 - ~~**📦 Embed MISSING.csv in sealed zips.**~~ ✅ Resolved by Phase 12b
   (v0.3 loose-corpus separation) — `missing.txt` now travels inside each
   release zip alongside `MANIFEST.csv`. The structural defense against
