@@ -27,12 +27,7 @@ load-bearing.
 - **`corpus/{gen}/index.csv` chunk overview** — per-gen file tracking chunk
   status + `sealed_at` timestamps. Spec §5.8. v0.3's aggregated index likely
   subsumes this; revisit when v0.3 lands.
-- **v0.3 design question: should the index aggregator also scan working dirs?**
-  Per-chunk `MANIFEST.csv` is only built at seal time, so working-dir flames have
-  no structured metadata until their chunk completes. A chunk that stays
-  partially probed for years means those files are invisible to v0.3's pyr3
-  index until either (a) the chunk seals naturally, (b) the user force-seals via
-  `seal --chunk`, or (c) v0.3 grows on-the-fly extraction for working-dir files.
-  Decision deferred to v0.3 design round; option (c) is more inclusive but
-  costlier per query. Note: also informs the future `reseal` design (combining
-  a force-sealed zip + new working dir back into one consistent zip).
+- ~~**v0.3 design question: should the index aggregator also scan working
+  dirs?**~~ — ✅ Resolved in Phase 11a (`sheep-fold index`): yes, it does.
+  `iter_corpus_flames` walks sealed zips AND working-dir chunks; each record
+  carries `sealed: bool` so agents can filter to frozen-only when needed.

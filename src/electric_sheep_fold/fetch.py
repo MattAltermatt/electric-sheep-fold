@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+from electric_sheep_fold import __version__
 from electric_sheep_fold.chunks import Chunk
 from electric_sheep_fold.layout import chunk_for, remote_url
 from electric_sheep_fold.manifest import MissingSet
@@ -21,7 +22,7 @@ log = logging.getLogger(__name__)
 
 
 USER_AGENT = (
-    "electric-sheep-fold/0.2 (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)"
+    f"electric-sheep-fold/{__version__} (companion to pyr3; https://github.com/MattAltermatt/electric-sheep-fold)"
 )
 
 

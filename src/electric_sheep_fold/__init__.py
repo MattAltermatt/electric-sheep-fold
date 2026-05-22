@@ -1,3 +1,3 @@
 """electric-sheep-fold — polite mirror of Electric Sheep .flam3 genomes."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
