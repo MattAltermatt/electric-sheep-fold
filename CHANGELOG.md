@@ -136,16 +136,14 @@ with provenance, so the raw dirs were ~1.8GB of redundant data. The
 `_scrape-247/` symlink tree is preserved pending Phase 10's live-track
 reconciliation.
 
-### Project rename: `electric-sheep-fold` → `electric-sheep-fold`
+### Project name finalized to `electric-sheep-fold`
 
-Original name was reaching for *shearing* (extract / clip wool) but the
-work is *preservation* — and "fold" was English-ambiguous. `sheepfold`
-captures the sanctuary framing. CLI binary stays short: `sheep-fold`.
-
-- Python package: `electric_sheep_fold` → `electric_sheep_fold`
-- CLI binary: `electric-sheep-fold` → `sheep-fold` (short for tab-completion)
-- User-Agent, README, all docs, spec/plan filenames retargeted
-- All 135 tests green after rename
+The working name was set aside in favor of `electric-sheep-fold` —
+`sheepfold` captures the sanctuary framing (the work here is preservation,
+not extraction). CLI binary stays short: `sheep-fold`. Python package,
+User-Agent string, README / docs / spec / plan filenames, GitHub repo
+name all retargeted in one cutover commit. All 135 tests green after the
+rename.
 
 ### Phase 8 — comprehensive dead-gen preservation pipeline
 
