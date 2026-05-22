@@ -15,6 +15,7 @@ from electric_sheep_fold.importer import import_dir
 from electric_sheep_fold.index import build_index
 from electric_sheep_fold.layout import LIVE_GENS, chunk_for, remote_url, sealed_zip_path
 from electric_sheep_fold.manifest import MissingSet
+from electric_sheep_fold.release import build_release
 
 app = typer.Typer(
     help="Polite mirror of Electric Sheep .flam3 genomes (chunked .zip storage).",
@@ -196,6 +197,36 @@ def index(
     )
     typer.echo(f"wrote {out_dir / 'index.json'}")
     typer.echo(f"wrote {out_dir / 'INDEX.md'}")
+
+
+@app.command("release-build")
+def release_build_cmd(
+    corpus: Path = typer.Option(Path("./corpus")),
+    out: Path = typer.Option(
+        Path("./build/release"),
+        "--out",
+        help="Where to write gen-*.zip + corpus-all.zip + index + attribution.",
+    ),
+    gen: int | None = typer.Option(
+        None,
+        "--gen",
+        help="Build only this gen's zip (skip mega-bundle + index regen).",
+    ),
+) -> None:
+    """Build the GitHub Release artifact set from corpus state.
+
+    Reads loose .flam3 files (v0.3) or sealed transit zips (v0.2 bridge),
+    plus missing.txt; writes gen-{N}.zip + corpus-all.zip + INDEX.md +
+    index.json + ATTRIBUTION.md to --out. Re-runnable; deterministic
+    output (modulo zip member timestamps).
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not corpus.exists():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+    written = build_release(corpus, out, only_gen=gen)
+    typer.echo(f"\nwrote {len(written)} files to {out}:")
+    for p in written:
+        typer.echo(f"  {p.name}")
 
 
 @app.command()
