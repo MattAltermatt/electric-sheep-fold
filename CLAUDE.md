@@ -7,7 +7,14 @@ uv pip install -e ".[dev]"         # editable install + pytest
 pytest -q                          # full test suite (~170 tests, no real network)
 sheep-fold --help                  # CLI entry — fetch / fetch-all / import / seal / status / index
 sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
+./scripts/build_release.sh         # assemble build/release/{gen-*.zip, corpus-all.zip, ...} for a Release upload
 ```
+
+**What this repo is:** the preserved Electric Sheep `.flam3` corpus, with
+the `sheep-fold` toolchain as its build/maintain pipeline. The corpus
+itself is published as GitHub Releases (per-gen zips + `corpus-all.zip`
+mega-bundle + `INDEX.md` + `index.json` + `ATTRIBUTION.md`). The git tree
+holds the tooling + docs; corpus data is gitignored and lives in Releases.
 
 Agentic queries against the corpus are documented in
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
@@ -89,14 +96,13 @@ These must NOT be violated without a deliberate spec update:
   the ES attribution scheme — never rename, never strip, never re-encode.
 - **Tool license:** GPL-3.0-or-later (matches pyr3, matches flam3 upstream).
   Corpus data is CC per ES policy — see [`README.md`](README.md).
-- **Chunk size — live vs dead split** ([v0.2.1 addendum](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md)):
-  - **Live-preserved gens** (sourced via `v3d0.sheepserver.net`, gens 247 +
-    248) → **10k ids per chunk**, chunks named `NNNNN-NNNNN.zip`. Keep this
-    shape forever, even after the upstream gen dies.
-  - **Dead-preserved gens** (sourced via `electricsheep.com/archives`, gens
-    165 / 169 / 191 / 198 / 242 / 243 / 244 / 245) → **one whole-gen zip**
-    spanning `[0, max_observed_id + 1)`, e.g. `00000-86475.zip` for gen 244.
-  - A gen's chunk shape is fixed at first preservation; never re-chunked.
+- **Chunk shape: whole-gen for every gen** (v0.2.2 unification — supersedes
+  v0.2.1's live-vs-dead split). One sealed `.zip` per generation under
+  `corpus/{gen}/{NNNNN}-{NNNNN}.zip`, spanning `[0, max_observed_id + 1)`.
+  Live gens (247 + 248) extend their max_id over time as `fetch-all` finds
+  new flames; each new corpus snapshot ships as a new GitHub Release. The
+  v0.2.1 10k-chunk shape for live gens is dropped (the "10k = distribution
+  unit" rationale was killed when distribution moved to Releases).
 - **Sealed-immutable:** once a chunk is sealed (`.zip` exists), its contents are
   frozen. No append-to-zip. Re-key flow is `reseal` (backlog).
 - **Range-completion is the seal trigger:** a chunk seals when every id in
