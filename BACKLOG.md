@@ -5,6 +5,19 @@ load-bearing.
 
 ## Tooling / ingest
 
+- **🗜️ Ship `.tar.xz` Release artifact alongside `.zip`.** Deferred 2026-05-22
+  pending real demand. Benchmark on gen 244 (943 MB uncompressed): current
+  DEFLATE-9 zip = 214 MB; `tar.xz` preset-9e = 58 MB (**−73%**). Whole-corpus
+  projection: ~525 MB → ~140 MB. Solid LZMA2 dedupes across the 33k+ entries'
+  shared XML scaffolding / palette structure, which per-entry DEFLATE can't
+  see. **Why not in-tree:** in-tree zips are hot-path random-access for
+  `sheep-fold fetch / import / index` AND agentic `jq` queries; solid
+  archives require decompressing up to the target entry. Keep `.zip` in
+  tree, add `.tar.xz` only as a Release-distribution-only artifact for
+  fresh-install downloaders. Pull forward when someone complains about
+  download size. *Rejected sibling:* LZMA-in-zip is portable to bsdtar /
+  Finder but **silently skips on Info-ZIP `unzip` 6.00** (default on macOS
+  + most Linux), so a non-starter for zip-format compatibility claims.
 - **📦 Embed MISSING.csv in sealed zips.** Extend `Chunk.seal()` to write
   `MISSING.csv` alongside `MANIFEST.csv` listing every id in `[start, end)`
   that isn't a `.flam3` member (one row per id, plus `reason` /
