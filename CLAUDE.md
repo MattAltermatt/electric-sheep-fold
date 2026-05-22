@@ -5,7 +5,7 @@
 ```sh
 uv pip install -e ".[dev]"         # editable install + pytest
 pytest -q                          # full test suite (~170 tests, no real network)
-sheep-fold --help                  # CLI entry — fetch / fetch-all / import / seal / status / index
+sheep-fold --help                  # CLI entry — fetch / fetch-all / import / status / index / release-build / unseal
 sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
 ./scripts/build_release.sh         # assemble build/release/{gen-*.zip, corpus-all.zip, ...} for a Release upload
 ```
@@ -19,7 +19,7 @@ holds the tooling + docs; corpus data is gitignored and lives in Releases.
 Agentic queries against the corpus are documented in
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
 — `jq` recipes for variation lookup, pyr3-parity filtering, etc. Re-run
-`sheep-fold index` after any `import` / `seal` / `unseal` to keep the
+`sheep-fold index` after any `fetch` / `fetch-all` / `import` to keep the
 index in sync with the corpus.
 
 ## Conventions
@@ -62,10 +62,11 @@ These must NOT be violated without a deliberate spec update:
   3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
      `_missing_404.txt`, GET `spex`. Accept only valid flam3 (see
      `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
-  Output → `sheep-fold import --whole-gen` (auto-seals as one whole-gen zip
-  per the v0.2.1 policy). All eight dead flam3 gens listed above are fully
-  preserved + sealed as of 2026-05-21 (see `CHANGELOG.md` for counts); the
-  preservation scripts are now quiescent and can be removed if needed.
+  Output → `sheep-fold import` (writes flat `.flam3` files into
+  `corpus/{gen}/` + merges `_missing_404.txt` → `corpus/{gen}/missing.txt`).
+  All eight dead flam3 gens listed above are fully preserved as of
+  2026-05-21 (see `CHANGELOG.md` for counts); the preservation scripts are
+  now quiescent and can be removed if needed.
 - **MPG-only generations are permanently out of scope.** `old`, `very-old`,
   and gen `23` are video-only on the archive — content-addressed by MD5 hash
   under `archives/{old,very-old}/...` (not `generation-N/`), no `spex`
@@ -96,25 +97,35 @@ These must NOT be violated without a deliberate spec update:
   the ES attribution scheme — never rename, never strip, never re-encode.
 - **Tool license:** GPL-3.0-or-later (matches pyr3, matches flam3 upstream).
   Corpus data is CC per ES policy — see [`README.md`](README.md).
-- **Chunk shape: whole-gen for every gen** (v0.2.2 unification — supersedes
-  v0.2.1's live-vs-dead split). One sealed `.zip` per generation under
-  `corpus/{gen}/{NNNNN}-{NNNNN}.zip`, spanning `[0, max_observed_id + 1)`.
-  Live gens (247 + 248) extend their max_id over time as `fetch-all` finds
-  new flames; each new corpus snapshot ships as a new GitHub Release. The
-  v0.2.1 10k-chunk shape for live gens is dropped (the "10k = distribution
-  unit" rationale was killed when distribution moved to Releases).
-- **Sealed-immutable:** once a chunk is sealed (`.zip` exists), its contents are
-  frozen. No append-to-zip. Re-key flow is `reseal` (backlog).
-- **Range-completion is the seal trigger:** a chunk seals when every id in
-  `[start, end)` has known status (present in working dir OR in `missing.txt`).
-- **MANIFEST.csv is the seam:** the first entry of every sealed zip carries the
-  extraction the v0.3 pyr3-facing index aggregates from. Schema in
-  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1.
+- **Loose-corpus, append-only** (v0.3 — supersedes v0.2.x sealed-zip
+  invariants). `corpus/{gen}/` is a flat dir of `electricsheep.{gen}.{id}.flam3`
+  files + a `missing.txt`. Mutated only by `fetch-all` / `import` (append a
+  flam3 OR append an id to `missing.txt`). Never deleted (the one-time `unseal`
+  consumed the v0.2 sealed zips). Same shape for live + dead gens; the gen's
+  biography is no longer encoded in the data layout.
+- **Release-built on demand.** Release zips live in `build/release/`, never
+  `corpus/`. `sheep-fold release-build` reads loose corpus → emits
+  `build/release/gen-{N}.zip` (containing `MANIFEST.csv` + `missing.txt` +
+  flat `.flam3` files) + `corpus-all.zip` mega-bundle. Pure derivative;
+  deterministic from corpus state (modulo timestamps). Re-runnable.
+- **Daemon-verified id counts post-migration.** The one-time `unseal` writes
+  `corpus/_unseal-verified.json` recording `loose_count` + `missing_count`
+  per gen. `fetch-all` calls `verify_unseal_consistency` at startup; if any
+  gen diverges (file count drift, missing.txt overwrite, partial restore),
+  the daemon refuses to start with a "run unseal first" message. Guards
+  against silent re-fetch of known ids after a botched migration.
+- **MANIFEST.csv + missing.txt are the release seam:** every release zip
+  contains `MANIFEST.csv` (11-col schema from v0.2 spec §4.1, still authoritative)
+  + `missing.txt` (sticky-404 ids, id-per-line). The pyr3-facing index
+  aggregates from both. Schema in
+  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1
+  (manifest) and
+  [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (release artifact).
 
 ## Where things live
 
-- `src/electric_sheep_fold/` — `layout`, `manifest`, `chunks`, `extract`, `fetch`,
-  `importer`, `migration`, `cli`
+- `src/electric_sheep_fold/` — `layout`, `manifest`, `extract`, `fetch`,
+  `importer`, `migration`, `release`, `unseal`, `cli`
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network
 - `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.

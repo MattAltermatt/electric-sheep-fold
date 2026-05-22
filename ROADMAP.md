@@ -20,22 +20,26 @@
 
 ### Phase 12a — gen 247 + 248 live-track extensions (continuous)
 
-Continue `sheep-fold fetch-all --gen 247` + `--gen 248` against v3d0 to extend each gen's `max_id` over time. Each extension cycle produces a new corpus snapshot → new GitHub Release with updated `gen-247.zip` / `gen-248.zip`. Sticky-404 + already-on-disk skip-without-network make the cadence efficient.
+Continue `sheep-fold fetch-all --gen 247` + `--gen 248` against v3d0 to extend each gen's `max_id` over time. Each extension cycle produces a new corpus snapshot → new GitHub Release with updated `gen-247.zip` / `gen-248.zip`. Sticky-404 + already-on-disk skip-without-network make the cadence efficient. **v0.3 makes this safe** — no reseal / no sticky-404 loss on extension.
 
-### Phase 12b — v0.3 pyr3-facing index / search (next round)
+### Phase 12b — v0.3 loose-corpus separation (in flight — branch `feature/v0.3-loose-corpus`)
 
-The Phase 11a indexer is a complete first cut — re-runnable, agent-readable, covers all 10 gens. v0.3 extensions to consider: SQLite-backed query interface (faster than scanning 34MB JSON), curated examples file (`curated.md` analog), palette-hash field, incremental rebuild (rebuild only chunks that changed since last index). Subsumes the old "verify subcommand" idea (sha256 in MANIFEST enables verify-as-query) and the BACKLOG `attribution.csv extractor` entry.
+Separate the on-disk corpus from the release artifact. `corpus/{gen}/` becomes flat `.flam3` files + `missing.txt` for ALL gens; release zips live in `build/release/` and are built on demand by `sheep-fold release-build`. Retires `seal` / `chunk` / sealed-immutable. One-time `sheep-fold unseal --all` migrates the 10 existing whole-gen zips. Spec: [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md). Plan: `/Users/matt/.claude/plans/a-sounds-good-please-tranquil-star.md`.
 
-### Phase 12 — pyr3 integration
+### Phase 12c — pyr3-facing index ergonomics (post-v0.3, was old "v0.3" candidate)
 
-pyr3 reads `corpus/{gen}/` (sealed zips + index) as parity-test source. The point of the whole exercise.
+The Phase 11a indexer is a complete first cut. Future extensions to consider: SQLite-backed query interface (faster than scanning 34MB JSON), curated examples file (`curated.md` analog), palette-hash field, incremental rebuild (rebuild only gens that changed since last index). v0.3's loose corpus makes incremental rebuild trivial (mtime per gen dir). Subsumes the old "verify subcommand" idea (sha256 in MANIFEST enables verify-as-query) and the BACKLOG `attribution.csv extractor` entry.
 
-### Phase 13 — additional generations 🐑
+### Phase 13 — pyr3 integration
+
+pyr3 reads `corpus/{gen}/` (loose files + index) as parity-test source. The point of the whole exercise.
+
+### Phase 14 — additional generations 🐑
 
 Run `sheep-fold fetch-all --gen 249` (etc.) as ES rolls over. One-line edit to extend `LIVE_GENS` in `layout.py`; no other code changes.
 
 ## 🚧 Todos (next session)
 
-- Run `sheep-fold fetch-all --gen 247` against v3d0 to extend the gen beyond id 29999 (current max). Sealed v0.2.2 snapshot is the floor; next Release publishes the new state.
-- Continue `sheep-fold fetch-all --gen 248` live track.
-- Start Phase 12b (v0.3) design round if shifting attention from corpus-growth to index ergonomics (SQLite-backed query layer, incremental rebuild, etc.).
+- 🎯 **Execute Phase 12b (v0.3 loose-corpus separation)**, currently on `feature/v0.3-loose-corpus`. Land per the plan: Phase B (v0.2.5 snapshot) → C (`release-build`) → D (`unseal` + migration) → E (loose-fetch rewrite) → F (review) → G (docs + resume + ship).
+- After v0.3 ships: resume `sheep-fold fetch-all --gen 247` from the captured 32086 resume point. Continue `--gen 248`.
+- Phase 12c (index ergonomics) — pull forward when corpus-growth slows or pyr3 integration demands faster queries.
