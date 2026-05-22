@@ -16,6 +16,11 @@ from electric_sheep_fold.index import build_index
 from electric_sheep_fold.layout import LIVE_GENS, chunk_for, remote_url, sealed_zip_path
 from electric_sheep_fold.manifest import MissingSet
 from electric_sheep_fold.release import build_release
+from electric_sheep_fold.unseal import (
+    unseal_all,
+    unseal_gen,
+    verify_unseal_consistency,
+)
 
 app = typer.Typer(
     help="Polite mirror of Electric Sheep .flam3 genomes (chunked .zip storage).",
@@ -227,6 +232,121 @@ def release_build_cmd(
     typer.echo(f"\nwrote {len(written)} files to {out}:")
     for p in written:
         typer.echo(f"  {p.name}")
+
+
+@app.command()
+def unseal(
+    gen: int | None = typer.Option(
+        None,
+        "--gen",
+        help="Unseal a single gen. Mutually exclusive with --all.",
+    ),
+    all_: bool = typer.Option(
+        False,
+        "--all",
+        help="Unseal every gen subdir holding a sealed zip.",
+    ),
+    corpus: Path = typer.Option(Path("./corpus"), "--corpus"),
+    snapshot_root: Path | None = typer.Option(
+        None,
+        "--snapshot-root",
+        help="Snapshot dir for the pre-unseal v0.2 zips "
+        "(default: <corpus parent>/build/v0.2-snapshot).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report what would happen without touching disk.",
+    ),
+) -> None:
+    """Migrate v0.2 sealed zips → v0.3 loose flam3 files (one-time).
+
+    6-step SIGKILL-safe state machine per gen (snapshot → extract →
+    verify → atomic-move → audit MANIFEST → commit). Idempotent and
+    resumable; the ``.unseal-state`` marker carries crash recovery.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if gen is None and not all_:
+        raise typer.BadParameter("must specify --gen N or --all")
+    if gen is not None and all_:
+        raise typer.BadParameter("--gen and --all are mutually exclusive")
+    if not corpus.is_dir():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+
+    if dry_run:
+        # Enumerate target gens; describe state without mutating disk.
+        from electric_sheep_fold.unseal import (
+            _GEN_DIR_RE,
+            _find_sealed_zip,
+            _read_state,
+        )
+
+        if gen is not None:
+            target_gens = [gen]
+        else:
+            target_gens = sorted(
+                int(p.name)
+                for p in corpus.iterdir()
+                if p.is_dir() and _GEN_DIR_RE.match(p.name)
+            )
+
+        for g in target_gens:
+            gen_dir = corpus / str(g)
+            if not gen_dir.is_dir():
+                typer.echo(f"  gen {g}: SKIP (no gen dir)")
+                continue
+            sz = _find_sealed_zip(gen_dir)
+            state = _read_state(gen_dir)
+            if sz is None and state is None:
+                typer.echo(f"  gen {g}: SKIP (already loose, no sealed zip)")
+                continue
+            typer.echo(
+                f"  gen {g}: WOULD UNSEAL "
+                f"(source={sz.name if sz else 'n/a'}, state={state or 'fresh'})"
+            )
+        return
+
+    if gen is not None:
+        result = unseal_gen(gen, corpus, snapshot_root=snapshot_root)
+        if result.skipped:
+            typer.echo(f"gen {result.gen}: skipped (already unsealed or no zip)")
+        else:
+            typer.echo(
+                f"gen {result.gen}: unsealed → "
+                f"{result.loose_count} loose · {result.missing_count} missing · "
+                f"snapshot={result.snapshot_path}"
+            )
+        return
+
+    results = unseal_all(corpus, snapshot_root=snapshot_root)
+    typer.echo(f"\nunsealed {len(results)} gens:")
+    for r in results:
+        tag = "skipped" if r.skipped else "ok"
+        typer.echo(
+            f"  gen {r.gen}: {tag} · {r.loose_count} loose · "
+            f"{r.missing_count} missing"
+        )
+
+
+@app.command("verify-unseal")
+def verify_unseal_cmd(
+    corpus: Path = typer.Option(Path("./corpus"), "--corpus"),
+) -> None:
+    """Compare current on-disk gen state to ``_unseal-verified.json``.
+
+    Exits nonzero if any gen has shrunk in id count since unseal — the
+    daemon-resume guard. Empty output + exit 0 = consistent.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not corpus.is_dir():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+    divergences = verify_unseal_consistency(corpus)
+    if not divergences:
+        typer.echo("ok: all gens consistent with _unseal-verified.json")
+        return
+    for gen, reason in divergences:
+        typer.echo(f"  gen {gen}: {reason}")
+    raise typer.Exit(code=1)
 
 
 @app.command()
