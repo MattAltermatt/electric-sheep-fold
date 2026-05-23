@@ -39,6 +39,15 @@ class MissingSet:
     def __len__(self) -> int:
         return len(self._ids)
 
+    def sorted_ids(self) -> list[int]:
+        """Return the missing sheep_ids as a sorted ascending list.
+
+        Public seam for callers that need deterministic, ordered iteration
+        (release-build manifest rendering, INDEX.md aggregations, etc.).
+        Avoids reach-ins on the internal set.
+        """
+        return sorted(self._ids)
+
     def save_atomic(self) -> None:
         """Write to disk: tmp file → os.replace. Sorted, deduped, newline-terminated."""
         self.path.parent.mkdir(parents=True, exist_ok=True)

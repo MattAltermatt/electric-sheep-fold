@@ -6,30 +6,51 @@
 
 ## Download the corpus
 
-Each Release is a snapshot in time. Latest is **[v0.3.0](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.3.0)**:
+Each Release is a snapshot in time, stamped with its build date in the
+artifact filenames. Latest is **[v0.4.0](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.4.0)**
+(2026-05-23). Three consumer paths, all producing the same on-disk tree
+in the shared subset (overlay invariant):
 
 ```sh
-# Everything in one bundle (~535MB)
-gh release download v0.3.0 -p corpus-all.zip
-unzip corpus-all.zip
-
-# OR pick a specific generation
-gh release download v0.3.0 -p gen-244.zip
-unzip gen-244.zip
-
-# OR fetch the index first to see what's there
-gh release download v0.3.0 -p INDEX.md
-gh release download v0.3.0 -p index.json
+# Path A — bulk, one mega-bundle (LZMA2; ~110 MB)
+gh release download v0.4.0 -p corpus-all-2026-05-23.tar.xz
+mkdir corpus && cd corpus
+tar -xJf ../corpus-all-2026-05-23.tar.xz
+# Result: corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3
+#         plus _index/, ATTRIBUTION.md
 ```
 
-Each per-gen zip contains `MANIFEST.csv` + `missing.txt` (sticky-404 ids
-for that gen) + flat `electricsheep.{gen}.{id}.flam3` files. The
-`missing.txt` is new in v0.3 and tells consumers which ids are
-confirmed-empty without having to probe the upstream server.
+```sh
+# Path B — piecemeal, only the gens wanted
+gh release download v0.4.0 -p 'gen-247-*.zip' -p 'gen-248-*.zip'
+mkdir -p corpus/247 corpus/248
+unzip gen-247-2026-05-23.zip -d corpus/247/
+unzip gen-248-2026-05-23.zip -d corpus/248/
+# Result: same per-gen subtree as Path A
+```
 
-`index.json` is `jq`-queryable; `INDEX.md` is human + agent-readable. See
+```sh
+# Path C — combine: bulk first, patch a single gen from a later release
+tar -xJf corpus-all-2026-05-23.tar.xz
+unzip -o gen-247-2026-06-01.zip -d 247/   # newer per-gen snapshot
+```
+
+Each per-gen zip contains:
+
+- `MANIFEST.csv` — 11-column schema, regenerated from corpus state.
+- `missing.txt` — sticky-404 ids for that gen (new in v0.3; tells
+  consumers which ids are confirmed-empty without probing the upstream
+  server).
+- `{bucket}/electricsheep.{gen}.{id}.flam3` — chunked by `(id // 10000) * 10000`
+  so big gens stay browsable in Finder / `ls`.
+
+`index.json` is `jq`-queryable (v0.4 envelope:
+`{_schema_version: 4, _build_date, genomes: [...]}` — use `.genomes[]` as
+the iterator). `INDEX.md` is human + agent-readable. See
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
-for query recipes (find flames by variation, pyr3-parity filtering, etc.).
+for query recipes — find flames by variation, pyr3-parity filtering, the
+5 new pyr3 AutoRoute GPU-safety fields (`has_hyper_trig`, `has_edisc`,
+`max_abs_affine_coef`, `xform_count_post_symmetry`, `has_density_estimator`).
 
 ## What's in the corpus
 

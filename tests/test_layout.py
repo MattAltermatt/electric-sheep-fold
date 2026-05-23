@@ -1,4 +1,4 @@
-"""Tests for electric_sheep_fold.layout — pure path/URL math (v0.3 loose)."""
+"""Tests for electric_sheep_fold.layout — pure path/URL math (v0.4 chunked)."""
 from pathlib import Path
 
 from electric_sheep_fold.layout import (
@@ -6,6 +6,7 @@ from electric_sheep_fold.layout import (
     BASE_URL_DEFAULT,
     LIVE_GENS,
     archive_url,
+    bucket_for,
     flam3_filename,
     flam3_path,
     release_zip_path,
@@ -28,20 +29,50 @@ class TestFlam3Filename:
         assert flam3_filename(244, 16) == "electricsheep.244.00016.flam3"
 
 
+class TestBucketFor:
+    def test_id_zero(self):
+        assert bucket_for(0) == "00000"
+
+    def test_id_below_first_boundary(self):
+        assert bucket_for(9_999) == "00000"
+
+    def test_id_at_first_boundary(self):
+        assert bucket_for(10_000) == "10000"
+
+    def test_id_high_five_digit(self):
+        assert bucket_for(99_999) == "90000"
+
+    def test_id_six_digit_grows_naturally(self):
+        # zero-pad is a MIN; ids ≥100000 produce 6-digit bucket strings
+        assert bucket_for(100_000) == "100000"
+
+    def test_id_typical_gen244(self):
+        assert bucket_for(40_700) == "40000"
+
+    def test_id_just_below_decade(self):
+        assert bucket_for(19_999) == "10000"
+
+
 class TestFlam3Path:
-    def test_low_sheep(self, tmp_path: Path):
+    def test_low_sheep_bucketed(self, tmp_path: Path):
         assert flam3_path(248, 100, tmp_path) == (
-            tmp_path / "248" / "electricsheep.248.00100.flam3"
+            tmp_path / "248" / "00000" / "electricsheep.248.00100.flam3"
         )
 
-    def test_dead_gen(self, tmp_path: Path):
+    def test_dead_gen_bucketed(self, tmp_path: Path):
         assert flam3_path(244, 40_700, tmp_path) == (
-            tmp_path / "244" / "electricsheep.244.40700.flam3"
+            tmp_path / "244" / "40000" / "electricsheep.244.40700.flam3"
         )
 
-    def test_zero_id(self, tmp_path: Path):
+    def test_zero_id_bucketed(self, tmp_path: Path):
         assert flam3_path(247, 0, tmp_path) == (
-            tmp_path / "247" / "electricsheep.247.00000.flam3"
+            tmp_path / "247" / "00000" / "electricsheep.247.00000.flam3"
+        )
+
+    def test_boundary_id_starts_new_bucket(self, tmp_path: Path):
+        # id=10000 lives under bucket "10000", not "00000"
+        assert flam3_path(247, 10_000, tmp_path) == (
+            tmp_path / "247" / "10000" / "electricsheep.247.10000.flam3"
         )
 
 
@@ -91,11 +122,8 @@ class TestArchiveUrl:
 
 
 class TestRetiredHelpers:
-    """v0.3 removes chunk-* helpers — guard against accidental re-introduction."""
-
-    def test_bucket_for_removed(self):
-        import electric_sheep_fold.layout as layout_mod
-        assert not hasattr(layout_mod, "bucket_for")
+    """v0.2 chunk-* helpers stay retired; v0.4 reintroduces bucket_for with
+    a different shape (id // 10000 floor-bucket, not chunk-of-10k range)."""
 
     def test_local_path_removed(self):
         import electric_sheep_fold.layout as layout_mod

@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 import zipfile
+from datetime import date
 from pathlib import Path
 
 from electric_sheep_fold.index import (
+    HYPER_TRIG_VARIATIONS,
+    INDEX_SCHEMA_VERSION,
     VARIATIONS,
     build_index,
     iter_corpus_flames,
@@ -240,7 +243,11 @@ class TestBuildIndex:
 
         index_path = out_dir / "index.json"
         assert index_path.exists()
-        records = json.loads(index_path.read_text())
+        envelope = json.loads(index_path.read_text())
+        # v0.4 envelope
+        assert envelope["_schema_version"] == 4
+        assert isinstance(envelope["_build_date"], str)
+        records = envelope["genomes"]
         assert len(records) == 3
         ids = {r["id"] for r in records}
         assert ids == {"244/00001", "244/00002", "244/00003"}
@@ -249,6 +256,8 @@ class TestBuildIndex:
         assert "Corpus shape" in md
         assert "Variation usage" in md
         assert "Query recipes" in md
+        # v0.4 INDEX.md surfaces AutoRoute fields
+        assert "AutoRoute" in md
 
     def test_empty_corpus(self, tmp_path: Path):
         corpus = tmp_path / "corpus"
@@ -270,7 +279,8 @@ class TestBuildIndex:
         )
         out_dir = tmp_path / "out"
         build_index(corpus, out_dir)
-        records = json.loads((out_dir / "index.json").read_text())
+        envelope = json.loads((out_dir / "index.json").read_text())
+        records = envelope["genomes"]
         genomes = [r for r in records if r["kind"] == "genome"]
         parity_friendly = [
             r for r in genomes
@@ -279,3 +289,150 @@ class TestBuildIndex:
             and r["highlight_power"] < 0
         ]
         assert {r["id"] for r in parity_friendly} == {"244/00001"}
+
+
+# ----- v0.4 pyr3 AutoRoute GPU-safety fields ---------------------------------
+
+
+GENOME_EDISC = (
+    b'<flame name="edisc-test" size="640 480">'
+    b'  <xform weight="1" edisc="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_HYPER_TRIG = (
+    b'<flame name="tan-test" size="640 480">'
+    b'  <xform weight="1" tan="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_WIDE_AFFINE = (
+    b'<flame name="wide-coefs" size="640 480">'
+    b'  <xform weight="1" linear="1" coefs="7.5 0 0 7.5 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_DENSITY_EST = (
+    b'<flame name="density" size="640 480" estimator_radius="9">'
+    b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+
+class TestHyperTrigSet:
+    def test_canonical_membership(self):
+        expected = {"tan", "sec", "csc", "cot", "tanh", "sech", "csch", "coth"}
+        assert HYPER_TRIG_VARIATIONS == expected
+
+    def test_all_in_main_variations_set(self):
+        for v in HYPER_TRIG_VARIATIONS:
+            assert v in VARIATIONS
+
+
+class TestPyr3AutoRouteFields:
+    def test_has_edisc_true(self):
+        rec = parse_flame(GENOME_EDISC, 247, 1978)
+        assert rec["has_edisc"] is True
+        assert rec["has_hyper_trig"] is False
+
+    def test_has_edisc_false_when_absent(self):
+        rec = parse_flame(GENOME_LINEAR, 247, 100)
+        assert rec["has_edisc"] is False
+
+    def test_has_hyper_trig_true_for_tan(self):
+        rec = parse_flame(GENOME_HYPER_TRIG, 247, 286)
+        assert rec["has_hyper_trig"] is True
+        assert rec["has_edisc"] is False
+
+    def test_has_hyper_trig_false_for_linear_only(self):
+        rec = parse_flame(GENOME_LINEAR, 247, 100)
+        assert rec["has_hyper_trig"] is False
+
+    def test_max_abs_affine_coef_clean(self):
+        rec = parse_flame(GENOME_LINEAR, 247, 100)
+        # coefs = "1 0 0 1 0 0" → max |coef| = 1.0
+        assert rec["max_abs_affine_coef"] == 1.0
+
+    def test_max_abs_affine_coef_wide(self):
+        rec = parse_flame(GENOME_WIDE_AFFINE, 247, 50)
+        # coefs = "7.5 0 0 7.5 0 0" → max |coef| = 7.5 (triggers >5 gate)
+        assert rec["max_abs_affine_coef"] == 7.5
+
+    def test_max_abs_affine_includes_post_affine(self):
+        # GENOME_RICH has post="0.5 0 0 0.5 0 0" — max(1, 0.5) = 1.0
+        rec = parse_flame(GENOME_RICH, 247, 1)
+        assert rec["max_abs_affine_coef"] == 1.0
+
+    def test_max_abs_affine_handles_negatives(self):
+        flam3 = (
+            b'<flame size="640 480">'
+            b'  <xform weight="1" linear="1" coefs="-10.2 0 0 0.5 0 0"/>'
+            b'</flame>'
+        )
+        rec = parse_flame(flam3, 247, 0)
+        assert rec["max_abs_affine_coef"] == 10.2
+
+    def test_xform_count_post_symmetry_no_symmetry(self):
+        rec = parse_flame(GENOME_LINEAR, 247, 100)
+        assert rec["xform_count_post_symmetry"] == 2  # 2 xforms, no symmetry
+
+    def test_xform_count_post_symmetry_with_rotational(self):
+        # GENOME_RICH has <symmetry kind="2"/> + 2 xforms → 2 + (2-1) = 3
+        rec = parse_flame(GENOME_RICH, 247, 1)
+        assert rec["xform_count_post_symmetry"] == 3
+
+    def test_xform_count_post_symmetry_dihedral(self):
+        flam3 = (
+            b'<flame size="640 480">'
+            b'  <symmetry kind="-3"/>'
+            b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+            b'  <xform weight="1" spherical="1" coefs="1 0 0 1 0 0"/>'
+            b'</flame>'
+        )
+        rec = parse_flame(flam3, 247, 0)
+        # 2 xforms + (2*3 - 1) = 2 + 5 = 7
+        assert rec["xform_count_post_symmetry"] == 7
+
+    def test_has_density_estimator_true(self):
+        rec = parse_flame(GENOME_DENSITY_EST, 247, 0)
+        assert rec["has_density_estimator"] is True
+
+    def test_has_density_estimator_false_when_absent(self):
+        rec = parse_flame(GENOME_LINEAR, 247, 100)
+        assert rec["has_density_estimator"] is False
+
+    def test_has_density_estimator_false_when_zero(self):
+        flam3 = (
+            b'<flame size="640 480" estimator_radius="0">'
+            b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+            b'</flame>'
+        )
+        rec = parse_flame(flam3, 247, 0)
+        assert rec["has_density_estimator"] is False
+
+
+class TestIndexSchemaV4:
+    def test_envelope_has_schema_version_and_build_date(self, tmp_path: Path):
+        corpus = tmp_path / "corpus"
+        (corpus / "247" / "00000").mkdir(parents=True)
+        (corpus / "247" / "00000" / "electricsheep.247.00100.flam3").write_bytes(
+            GENOME_LINEAR
+        )
+        out_dir = tmp_path / "out"
+        build_index(corpus, out_dir, build_date=date(2026, 5, 23))
+
+        env = json.loads((out_dir / "index.json").read_text())
+        assert env["_schema_version"] == INDEX_SCHEMA_VERSION == 4
+        assert env["_build_date"] == "2026-05-23"
+        assert "genomes" in env
+        assert isinstance(env["genomes"], list)
+
+    def test_default_build_date_is_today(self, tmp_path: Path):
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        out_dir = tmp_path / "out"
+        build_index(corpus, out_dir)
+        env = json.loads((out_dir / "index.json").read_text())
+        # Just verify it parses as a date in the expected shape
+        assert len(env["_build_date"]) == 10
+        assert env["_build_date"][4] == "-"

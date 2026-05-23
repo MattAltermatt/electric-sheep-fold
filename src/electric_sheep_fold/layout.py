@@ -1,4 +1,4 @@
-"""Pure path / URL math for electric-sheep-fold. No I/O. (v0.3 loose corpus.)"""
+"""Pure path / URL math for electric-sheep-fold. No I/O. (v0.4 chunked corpus.)"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,9 +18,21 @@ def flam3_filename(gen: int, sheep_id: int) -> str:
     return f"electricsheep.{gen}.{sheep_id:05d}.flam3"
 
 
+def bucket_for(sheep_id: int) -> str:
+    # Floor to nearest decade-of-thousand; 5-digit zero-pad is a minimum
+    # (ids ≥100000 grow naturally to 6 digits).
+    return f"{(sheep_id // 10000) * 10000:05d}"
+
+
 def flam3_path(gen: int, sheep_id: int, corpus_root: Path) -> Path:
-    """Where a flam3 lives in the v0.3 loose corpus: corpus/{gen}/electricsheep.{gen}.{id}.flam3."""
-    return corpus_root / str(gen) / flam3_filename(gen, sheep_id)
+    """Where a flam3 lives in the v0.4 chunked corpus:
+    corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3."""
+    return (
+        corpus_root
+        / str(gen)
+        / bucket_for(sheep_id)
+        / flam3_filename(gen, sheep_id)
+    )
 
 
 def release_zip_path(gen: int, out_dir: Path) -> Path:

@@ -169,10 +169,23 @@ exist (see CLAUDE.md "Daemon-verified id counts" invariant).
 
 ---
 
-## Preserve a new dead generation
+## Preserve a new dead generation (historical, scripts removed in v0.4)
 
-If ES rolls a new dead gen (numbered higher than 248 but no longer
-served by `v3d0`), use the archive-scrape pipeline:
+All 8 dead flam3-bearing gens (165, 169, 191, 198, 242, 243, 244, 245)
+were fully preserved by 2026-05-21, and the archive-scrape scripts +
+their test were removed in v0.4 to reduce repo surface area. If ES ever
+rolls a new dead gen, recover the scripts from git history first:
+
+```sh
+git show v0.3.0:scripts/scrape_archive_gen.py        > scripts/scrape_archive_gen.py
+git show v0.3.0:scripts/preserve_archived_sheep.sh   > scripts/preserve_archived_sheep.sh
+git show v0.3.0:scripts/sanitize_scrape_dir.py       > scripts/sanitize_scrape_dir.py
+git show v0.3.0:scripts/seed_scrape_from_local.sh    > scripts/seed_scrape_from_local.sh
+git show v0.3.0:tests/test_scrape_archive.py         > tests/test_scrape_archive.py
+chmod +x scripts/*.sh
+```
+
+Then follow the original flow:
 
 ```sh
 # 1. Scrape from electricsheep.com/archives (polite 2s cadence)

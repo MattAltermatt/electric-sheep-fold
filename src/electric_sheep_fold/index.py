@@ -1,8 +1,12 @@
 """Aggregate corpus index for agentic / pyr3 consumption.
 
-Walks every sealed zip in `corpus/{gen}/`, parses each `.flam3`, and emits:
-  - `index.json` — one record per flame (machine-queryable; JSON array on a
-    single line for stream-friendly jq).
+Walks every loose `.flam3` file in `corpus/{gen}/{bucket}/` (the v0.4
+chunked layout) or surviving v0.2 sealed zips during one-shot migration
+windows, parses each, and emits:
+  - `index.json` — v0.4 envelope ``{_schema_version: 4, _build_date,
+    genomes: [...]}``. Per-genome record carries structural features
+    plus 5 pyr3 AutoRoute GPU-safety fields (has_hyper_trig, has_edisc,
+    max_abs_affine_coef, xform_count_post_symmetry, has_density_estimator).
   - `INDEX.md` — aggregations + recipe table for agentic scanning.
 
 Per-flame `kind`: `genome` (single-flame, fully indexed) · `animation`
@@ -20,8 +24,17 @@ import logging
 import re
 import zipfile
 from collections import Counter
+from datetime import date, datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
+INDEX_SCHEMA_VERSION = 4
+
+# Pyr3 AutoRoute GPU-safety: variations whose f32 denominator cancels at
+# ±π/2 (or n*π/2) — tan/sec/csc/cot family + hyperbolic siblings.
+HYPER_TRIG_VARIATIONS: frozenset[str] = frozenset({
+    "tan", "sec", "csc", "cot", "tanh", "sech", "csch", "coth",
+})
 
 log = logging.getLogger(__name__)
 
@@ -124,10 +137,18 @@ def _index_genome(rec: dict, root) -> dict:
     rec["supersample"] = _i(root.get("supersample", "1"))
     rec["highlight_power"] = _f(root.get("highlight_power", "-1"))
 
+    # Pyr3 AutoRoute: density-estimator tone-map gate. Flam3
+    # `estimator_radius` defaults to 9 historically but is only ACTIVE
+    # when the runtime path uses it; absence of the attribute means the
+    # baseline (off / disabled).
+    rec["has_density_estimator"] = _f(root.get("estimator_radius", "0")) > 0
+
     sym = root.find("symmetry")
     rec["has_symmetry"] = sym is not None
+    symmetry_kind = 0
     if sym is not None:
-        rec["symmetry_kind"] = _i(sym.get("kind", "0"))
+        symmetry_kind = _i(sym.get("kind", "0"))
+        rec["symmetry_kind"] = symmetry_kind
 
     xforms = root.findall("xform")
     final = root.find("finalxform")
@@ -141,12 +162,21 @@ def _index_genome(rec: dict, root) -> dict:
     xform_var_counts: list[int] = []
     has_post_affine_per_xform: list[bool] = []
     max_xform_weight = 0.0
+    max_abs_affine_coef = 0.0
     for xf in xforms:
         post = xf.get("post")
         xf_has_post = bool(post and post.strip() != IDENTITY_POST)
         has_post_affine_per_xform.append(xf_has_post)
         if xf_has_post:
             has_post_affine = True
+            max_abs_affine_coef = max(
+                max_abs_affine_coef, _max_abs_affine(post)
+            )
+        coefs = xf.get("coefs")
+        if coefs:
+            max_abs_affine_coef = max(
+                max_abs_affine_coef, _max_abs_affine(coefs)
+            )
         if xf.get("chaos") is not None:
             has_chaos = True
         weight = _f(xf.get("weight", "1"))
@@ -178,6 +208,19 @@ def _index_genome(rec: dict, root) -> dict:
                 n_final += 1
         final_xform_var_count = n_final
 
+    # Finalxform's coefs also count toward max_abs_affine_coef.
+    if final is not None:
+        coefs = final.get("coefs")
+        if coefs:
+            max_abs_affine_coef = max(
+                max_abs_affine_coef, _max_abs_affine(coefs)
+            )
+        post = final.get("post")
+        if post and post.strip() != IDENTITY_POST:
+            max_abs_affine_coef = max(
+                max_abs_affine_coef, _max_abs_affine(post)
+            )
+
     rec["has_post_affine"] = has_post_affine
     rec["has_chaos"] = has_chaos
     rec["negative_weight_xforms"] = negative_weight_xforms
@@ -192,7 +235,46 @@ def _index_genome(rec: dict, root) -> dict:
     rec["final_xform_var_count"] = final_xform_var_count
     rec["has_post_affine_per_xform"] = has_post_affine_per_xform
     rec["max_xform_weight"] = max_xform_weight
+
+    # Pyr3 AutoRoute GPU-safety fields (v0.4).
+    rec["has_hyper_trig"] = any(v in HYPER_TRIG_VARIATIONS for v in variations)
+    rec["has_edisc"] = "edisc" in variations
+    rec["max_abs_affine_coef"] = round(max_abs_affine_coef, 6)
+    rec["xform_count_post_symmetry"] = _post_symmetry_xform_count(
+        rec["xform_count"], symmetry_kind
+    )
     return rec
+
+
+def _max_abs_affine(coefs_str: str) -> float:
+    """Largest |coef| in a six-number affine string ``"a b c d e f"``.
+
+    Returns 0.0 on malformed input. Defensive against mid-string junk
+    (some genomes carry extra whitespace / comments).
+    """
+    best = 0.0
+    for tok in coefs_str.split():
+        try:
+            v = abs(float(tok))
+        except ValueError:
+            continue
+        if v > best:
+            best = v
+    return best
+
+
+def _post_symmetry_xform_count(xform_count: int, symmetry_kind: int) -> int:
+    """Estimate post-symmetry xform count for the pyr3 chaos pickTable cap.
+
+    Flam3 symmetry semantics: positive kind = N-fold rotational (adds
+    kind-1 synthetic xforms); negative kind = dihedral (adds 2*|kind|-1).
+    kind=0 or 1 = identity (no extra xforms).
+    """
+    if symmetry_kind > 1:
+        return xform_count + (symmetry_kind - 1)
+    if symmetry_kind < 0:
+        return xform_count + (2 * abs(symmetry_kind) - 1)
+    return xform_count
 
 
 def _index_animation(rec: dict, raw: bytes) -> dict:
@@ -239,20 +321,42 @@ def iter_corpus_flames(corpus_root: Path):
                     if not m:
                         continue
                     yield gen, int(m.group(2)), zf.read(name), True
-        # v0.3 native shape: loose flam3s in the gen dir.
-        for path in sorted(gen_dir.glob(f"electricsheep.{gen}.*.flam3")):
+        # v0.4 native shape: loose flam3s under per-10k bucket subdirs.
+        # rglob handles both v0.3 flat (transient pre-migrate-chunked) and
+        # v0.4 chunked layouts transparently.
+        for path in sorted(gen_dir.rglob(f"electricsheep.{gen}.*.flam3")):
             m = _FLAM3_RE.match(path.name)
             if not m:
                 continue
             yield gen, int(m.group(2)), path.read_bytes(), False
 
 
-def build_index(corpus_root: Path, out_dir: Path) -> dict:
-    """Walk every sealed zip, parse each flam3, emit `index.json` + `INDEX.md`.
+def build_index(
+    corpus_root: Path,
+    out_dir: Path,
+    *,
+    build_date: date | None = None,
+) -> dict:
+    """Walk the corpus, parse each flam3, emit ``index.json`` + ``INDEX.md``.
 
-    Returns a summary dict (total / genomes / animations / corrupt / variations
-    distinct count) — useful for callers / tests / CLI feedback.
+    v0.4 ``index.json`` envelope::
+
+        {
+          "_schema_version": 4,
+          "_build_date": "YYYY-MM-DD",
+          "genomes": [<record>, ...]
+        }
+
+    Per-record fields include the 5 pyr3 AutoRoute GPU-safety fields
+    (``has_hyper_trig``, ``has_edisc``, ``max_abs_affine_coef``,
+    ``xform_count_post_symmetry``, ``has_density_estimator``).
+
+    Returns a summary dict (total / genomes / animations / corrupt /
+    variations distinct count) — useful for callers / tests / CLI.
     """
+    if build_date is None:
+        build_date = datetime.now(tz=timezone.utc).date()
+
     records: list[dict] = []
     for gen, sheep_id, content, sealed in iter_corpus_flames(corpus_root):
         rec = parse_flame(content, gen, sheep_id)
@@ -261,8 +365,13 @@ def build_index(corpus_root: Path, out_dir: Path) -> dict:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     index_json = out_dir / "index.json"
+    envelope = {
+        "_schema_version": INDEX_SCHEMA_VERSION,
+        "_build_date": build_date.isoformat(),
+        "genomes": records,
+    }
     with index_json.open("w") as f:
-        json.dump(records, f, separators=(",", ":"))
+        json.dump(envelope, f, separators=(",", ":"))
         f.write("\n")
 
     md = _render_markdown(records)
@@ -371,6 +480,29 @@ def _render_markdown(records: list[dict]) -> str:
         "negative_weight_present": sum(1 for r in genomes if r["negative_weight_xforms"] > 0),
         "filter_shape_non_gaussian": sum(1 for r in genomes if r["filter_shape"] != "gaussian"),
     }
+    # Pyr3 AutoRoute GPU-safety (v0.4 — drives CPU-vs-GPU verdict).
+    pyr3_feats: dict[str, tuple[int, str]] = {
+        "has_hyper_trig": (
+            sum(1 for r in genomes if r.get("has_hyper_trig")),
+            "tan/sec/csc/cot/tanh/sech/csch/coth — GPU f32 cancels at ±π/2",
+        ),
+        "has_edisc": (
+            sum(1 for r in genomes if r.get("has_edisc")),
+            "edisc craters near unit circle → NaN (all-black render)",
+        ),
+        "max_abs_affine_coef > 5": (
+            sum(1 for r in genomes if r.get("max_abs_affine_coef", 0) > 5),
+            "GPU f32 exponent loss → orbit NaN",
+        ),
+        "xform_count_post_symmetry > 64": (
+            sum(1 for r in genomes if r.get("xform_count_post_symmetry", 0) > 64),
+            "GPU pickTable architectural cap",
+        ),
+        "has_density_estimator": (
+            sum(1 for r in genomes if r.get("has_density_estimator")),
+            "soft tone-map gate; GPU lacks HSV-desaturation",
+        ),
+    }
     L.append("## 🧬 Structural features (genomes only)")
     L.append("")
     L.append("| Feature | Count | Notes |")
@@ -382,6 +514,19 @@ def _render_markdown(records: list[dict]) -> str:
     }
     for k, v in feats.items():
         L.append(f"| `{k}` | {v:,} | {notes.get(k, '')} |")
+    L.append("")
+
+    L.append("## 🛡️ Pyr3 AutoRoute GPU-safety fields (v0.4)")
+    L.append("")
+    L.append(
+        "Static analysis driving pyr3's `AutoRoute.verdict()` CPU-vs-GPU "
+        "decision. A genome triggering ANY of these typically routes to CPU."
+    )
+    L.append("")
+    L.append("| Field | Count | Failure mode it gates |")
+    L.append("|-------|------:|-----------------------|")
+    for k, (v, note) in pyr3_feats.items():
+        L.append(f"| `{k}` | {v:,} | {note} |")
     L.append("")
 
     # Xform-count distribution
@@ -463,29 +608,40 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("## 🛠️ Query recipes")
     L.append("")
     L.append(
-        "**Default filter:** `kind == \"genome\"` — exclude animations + corrupt."
+        "**v0.4 schema note:** `index.json` is an envelope "
+        "`{_schema_version, _build_date, genomes: [...]}`. Recipes use "
+        "`.genomes[]` as the iterator. **Default filter:** "
+        "`kind == \"genome\"` — exclude animations + corrupt."
     )
+    L.append("")
+    L.append("Check schema version + build date:")
+    L.append("```")
+    L.append("jq '{_schema_version, _build_date}' index.json")
+    L.append("```")
     L.append("")
     L.append("Find genomes using a specific variation (e.g. `bipolar`):")
     L.append("```")
-    L.append('jq -r \'.[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id\' index.json | head')
+    L.append("```")
+    L.append("")
+    L.append("Find pyr3-GPU-safe genomes (no NaN-prone vars, modest affine coefs, low xform count, no density estimator):")
+    L.append("```")
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_hyper_trig | not) and (.has_edisc | not) and .max_abs_affine_coef <= 5 and .xform_count_post_symmetry <= 64 and (.has_density_estimator | not)) | .id\' index.json | head')
     L.append("```")
     L.append("")
     L.append("Find pyr3-parity-friendly genomes (no chaos, supersample=1, default highlight_power, has finalxform):")
     L.append("```")
-    L.append('jq -r \'.[] | select(.kind == "genome" and (.has_chaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_chaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')
     L.append("```")
-    L.append("")
-    L.append("Find rare-variation candidates (variations with low usage counts in the table above are stress tests).")
     L.append("")
     L.append("Find low-complexity baseline genomes:")
     L.append("```")
-    L.append('jq -r \'.[] | select(.kind == "genome" and .xform_count <= 2 and (.has_chaos | not)) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_chaos | not)) | .id\' index.json | head')
     L.append("```")
     L.append("")
     L.append("Inspect one flame in full:")
     L.append("```")
-    L.append('jq \'.[] | select(.id == "244/00016")\' index.json')
+    L.append('jq \'.genomes[] | select(.id == "244/00016")\' index.json')
     L.append("```")
     L.append("")
     L.append("Regenerate: `sheep-fold index` (overwrites `index.json` + `INDEX.md`).")

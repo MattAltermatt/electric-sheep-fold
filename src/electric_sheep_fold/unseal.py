@@ -570,7 +570,7 @@ def verify_unseal_consistency(
             divergences.append((gen, f"gen dir missing: {gen_dir}"))
             continue
         actual_loose = sum(
-            1 for _ in gen_dir.glob(f"electricsheep.{gen}.*.flam3")
+            1 for _ in gen_dir.rglob(f"electricsheep.{gen}.*.flam3")
         )
         ms = MissingSet(gen_dir / "missing.txt")
         ms.load()

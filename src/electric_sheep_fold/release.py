@@ -1,34 +1,37 @@
-"""Release-artifact build for electric-sheep-fold v0.3.
+"""Release-artifact build for electric-sheep-fold v0.4.
 
-Reads on-disk corpus state and produces ``build/release/`` zips on demand:
+Reads on-disk chunked corpus state and produces dated ``build/release/``
+artifacts on demand:
 
-* ``gen-{N}.zip`` — per-generation; contains ``MANIFEST.csv`` + ``missing.txt``
-  + flat ``electricsheep.{N}.{id}.flam3`` files
-* ``corpus-all.zip`` — mega-bundle containing every ``gen-{N}.zip`` plus
-  ``INDEX.md`` / ``index.json`` / ``ATTRIBUTION.md``
-* ``INDEX.md`` + ``index.json`` — regenerated via the existing
-  ``sheep-fold index`` machinery
-* ``ATTRIBUTION.md`` — copied from ``corpus/ATTRIBUTION.md``
+* ``gen-{N}-{YYYY-MM-DD}.zip`` — per-generation; ZIP DEFLATE-9. Members:
+  ``MANIFEST.csv``, ``missing.txt``, ``{bucket}/electricsheep.{N}.{id}.flam3``.
+* ``corpus-all-{YYYY-MM-DD}.tar.xz`` — mega-bundle; full corpus tree
+  including ``{gen}/MANIFEST.csv``, ``{gen}/missing.txt``,
+  ``{gen}/{bucket}/electricsheep.{N}.{id}.flam3``, ``_index/*``,
+  ``ATTRIBUTION.md``. LZMA preset 6.
+* ``INDEX.md`` + ``index.json`` — regenerated via ``sheep-fold index``.
+* ``ATTRIBUTION.md`` — copied from ``corpus/ATTRIBUTION.md``.
 
-Corpus shape v0.3 is loose ``.flam3`` files in each gen dir; this module
-also accepts the v0.2 sealed-zip-per-gen shape as a transit mode so we
-have a release-build path before the one-time Phase D ``unseal``
-migration runs.
+Overlay invariant: per-gen zip extracted under ``{gen}/`` produces the
+same on-disk tree as the matching subset of the mega-bundle. Consumers
+can grab piecemeal or all-in-one and they fit together.
 
-All zip writes are atomic (``.tmp`` + ``os.replace``). Sheep ids are
-iterated in sorted order for reproducible byte-stable output (modulo
-zip member timestamps).
+All zip / tar.xz writes are atomic (``.tmp`` + ``os.replace``). Sheep
+ids iterate in sorted order for reproducible byte-stable output (modulo
+member timestamps).
 """
 from __future__ import annotations
 
 import csv
 import io
 import logging
+import lzma
 import os
 import re
 import shutil
+import tarfile
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -39,6 +42,7 @@ from electric_sheep_fold.layout import (
     BASE_URL_DEFAULT,
     LIVE_GENS,
     archive_url,
+    bucket_for,
     flam3_filename,
     remote_url,
 )
@@ -80,7 +84,7 @@ def _gather_gen_data(
         raise FileNotFoundError(f"gen dir not found: {gen_dir}")
 
     sealed_zips = sorted(gen_dir.glob("?????-?????.zip"))
-    loose_paths = sorted(gen_dir.glob(f"electricsheep.{gen}.*.flam3"))
+    loose_paths = sorted(gen_dir.rglob(f"electricsheep.{gen}.*.flam3"))
     # Hybrid is a transient unseal-in-progress state; safe to read both
     # (loose overrides sealed on id collision below) but worth flagging so
     # an operator notices a half-finished migration before shipping a
@@ -139,10 +143,16 @@ def _build_manifest_bytes(
 
 def _build_missing_bytes(missing: MissingSet) -> bytes:
     """Render MissingSet in its on-disk format (id-per-line, sorted)."""
-    # Use the internal sorted set rather than re-reading the file —
-    # _gather_gen_data already loaded it.
-    ids = sorted(missing._ids)  # noqa: SLF001 — release.py owns this seam.
+    ids = missing.sorted_ids()
     return ("".join(f"{sid}\n" for sid in ids)).encode("utf-8")
+
+
+def _gen_zip_filename(gen: int, build_date: date) -> str:
+    return f"gen-{gen}-{build_date.isoformat()}.zip"
+
+
+def _mega_tarxz_filename(build_date: date) -> str:
+    return f"corpus-all-{build_date.isoformat()}.tar.xz"
 
 
 def build_gen_zip(
@@ -150,17 +160,18 @@ def build_gen_zip(
     corpus_root: Path,
     out_dir: Path,
     *,
+    build_date: date | None = None,
     source_url_for: Callable[[int], str] | None = None,
     fetched_at: datetime | None = None,
 ) -> Path:
-    """Build ``out_dir/gen-{gen}.zip`` from ``corpus/{gen}/`` state.
+    """Build ``out_dir/gen-{gen}-{date}.zip`` from ``corpus/{gen}/`` state.
 
-    Auto-detects loose-corpus (v0.3) vs sealed-zip-transit (v0.2) shape.
-    Contents:
+    Contents (v0.4 chunked):
 
     * ``MANIFEST.csv`` (regenerated via ``extract.extract_metadata``)
     * ``missing.txt`` (id-per-line, sorted; mirrors on-disk format)
-    * ``electricsheep.{gen}.{id}.flam3`` for every present sheep, flat
+    * ``{bucket}/electricsheep.{gen}.{id}.flam3`` — chunked tree mirroring
+      disk layout, so ``unzip -d {gen}/`` reproduces the corpus tree.
 
     Atomic write via ``.tmp`` + ``os.replace``. Returns the written path.
     """
@@ -169,6 +180,8 @@ def build_gen_zip(
         source_url_for = _default_source_url_for(gen)
     if fetched_at is None:
         fetched_at = datetime.now(tz=timezone.utc)
+    if build_date is None:
+        build_date = datetime.now(tz=timezone.utc).date()
 
     manifest_bytes = _build_manifest_bytes(
         gen, records, source_url_for=source_url_for, fetched_at=fetched_at
@@ -176,7 +189,7 @@ def build_gen_zip(
     missing_bytes = _build_missing_bytes(missing)
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / f"gen-{gen}.zip"
+    dest = out_dir / _gen_zip_filename(gen, build_date)
     tmp = dest.with_suffix(dest.suffix + ".tmp")
     with zipfile.ZipFile(
         tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
@@ -184,7 +197,8 @@ def build_gen_zip(
         zf.writestr("MANIFEST.csv", manifest_bytes)
         zf.writestr("missing.txt", missing_bytes)
         for sheep_id in sorted(records):
-            zf.writestr(flam3_filename(gen, sheep_id), records[sheep_id])
+            arcname = f"{bucket_for(sheep_id)}/{flam3_filename(gen, sheep_id)}"
+            zf.writestr(arcname, records[sheep_id])
     os.replace(tmp, dest)
     log.info(
         "built %s (%d sheep, %d missing)", dest.name, len(records), len(missing)
@@ -201,67 +215,138 @@ def _discover_gens(corpus_root: Path) -> list[int]:
     )
 
 
-def _build_mega_bundle(out_dir: Path) -> Path:
-    """Pack every gen-*.zip + INDEX/index/ATTRIBUTION into corpus-all.zip.
+def _build_mega_tarxz(
+    corpus_root: Path,
+    out_dir: Path,
+    build_date: date,
+    *,
+    source_url_for_gen: Callable[[int], Callable[[int], str]] | None = None,
+    fetched_at: datetime | None = None,
+    preset: int = 6,
+) -> Path:
+    """Pack the full v0.4 corpus tree into ``out_dir/corpus-all-{date}.tar.xz``.
 
-    Mirrors the legacy ``scripts/build_release.sh`` `zip -X` behavior:
-    DEFLATE level 9, no extra fields. Atomic via tmp + os.replace.
+    Members (corpus-relative):
+
+      * ``{gen}/MANIFEST.csv``
+      * ``{gen}/missing.txt``
+      * ``{gen}/{bucket}/electricsheep.{gen}.{id}.flam3``
+      * ``_index/index.json``, ``_index/INDEX.md``
+      * ``ATTRIBUTION.md``
+
+    Overlay invariant: extracting this archive into an empty staging
+    dir produces the same tree as ``unzip``-ing every per-gen zip into
+    its respective ``{gen}/`` subdir (modulo the ``_index/`` and
+    ``ATTRIBUTION.md`` top-level files which only the tar.xz carries).
+
+    Atomic via tmp + os.replace. LZMA preset defaults to 6 (good ratio,
+    reasonable build time).
     """
-    dest = out_dir / "corpus-all.zip"
+    if fetched_at is None:
+        fetched_at = datetime.now(tz=timezone.utc)
+
+    dest = out_dir / _mega_tarxz_filename(build_date)
     tmp = dest.with_suffix(dest.suffix + ".tmp")
-    members = sorted(out_dir.glob("gen-*.zip")) + [
-        out_dir / "INDEX.md",
-        out_dir / "index.json",
-        out_dir / "ATTRIBUTION.md",
-    ]
-    with zipfile.ZipFile(
-        tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
-    ) as zf:
-        for p in members:
-            if p.exists():
-                zf.write(p, arcname=p.name)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with lzma.open(tmp, "wb", preset=preset) as xz, \
+         tarfile.open(fileobj=xz, mode="w|") as tf:
+        for gen in _discover_gens(corpus_root):
+            records, missing = _gather_gen_data(gen, corpus_root)
+            url_for = (
+                source_url_for_gen(gen)
+                if source_url_for_gen is not None
+                else _default_source_url_for(gen)
+            )
+            manifest_bytes = _build_manifest_bytes(
+                gen, records, source_url_for=url_for, fetched_at=fetched_at
+            )
+            missing_bytes = _build_missing_bytes(missing)
+            _tar_addbytes(tf, f"{gen}/MANIFEST.csv", manifest_bytes)
+            _tar_addbytes(tf, f"{gen}/missing.txt", missing_bytes)
+            for sheep_id in sorted(records):
+                arcname = (
+                    f"{gen}/{bucket_for(sheep_id)}/"
+                    f"{flam3_filename(gen, sheep_id)}"
+                )
+                _tar_addbytes(tf, arcname, records[sheep_id])
+
+        for rel in ("_index/index.json", "_index/INDEX.md", "ATTRIBUTION.md"):
+            src = corpus_root / rel
+            if src.exists():
+                tf.add(src, arcname=rel, recursive=False)
+
     os.replace(tmp, dest)
     log.info("built %s", dest.name)
     return dest
+
+
+def _tar_addbytes(tf: tarfile.TarFile, arcname: str, data: bytes) -> None:
+    info = tarfile.TarInfo(name=arcname)
+    info.size = len(data)
+    info.mtime = 0  # reproducible-ish; epoch-seconds-zero
+    info.mode = 0o644
+    tf.addfile(info, io.BytesIO(data))
 
 
 def build_release(
     corpus_root: Path,
     out_dir: Path,
     *,
+    build_date: date | None = None,
     only_gen: int | None = None,
     regen_index: bool = True,
+    skip_mega: bool = False,
 ) -> list[Path]:
-    """Build the full release artifact set into ``out_dir``.
+    """Build the full v0.4 release artifact set into ``out_dir``.
 
     Steps:
       1. Regenerate ``corpus/_index/{index.json,INDEX.md}`` (unless
          ``regen_index=False``).
       2. ``build_gen_zip`` for every numeric gen in ``corpus/`` (or just
-         ``only_gen`` if specified).
+         ``only_gen`` if specified). Filename ``gen-{N}-{date}.zip``.
       3. Copy ``INDEX.md`` / ``index.json`` / ``ATTRIBUTION.md`` from
          ``corpus/`` to ``out_dir/``.
-      4. Build ``corpus-all.zip`` mega-bundle.
+      4. Build ``corpus-all-{date}.tar.xz`` mega-bundle (unless
+         ``skip_mega=True``).
 
     ``only_gen`` mode skips steps 1, 3, and 4 — used by ``--gen N`` for
-    fast per-gen rebuilds.
+    fast per-gen rebuilds. ``skip_mega`` is a test-only escape hatch
+    to avoid LZMA cost on small fixtures.
 
     Returns the list of paths written (in order).
     """
+    # Single `fetched_at` shared across per-gen zips AND mega-bundle so
+    # their MANIFEST.csv outputs are byte-identical — load-bearing for the
+    # overlay invariant.
+    fetched_at = datetime.now(tz=timezone.utc)
+    if build_date is None:
+        build_date = fetched_at.date()
+
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
 
     if only_gen is not None:
-        written.append(build_gen_zip(only_gen, corpus_root, out_dir))
+        written.append(
+            build_gen_zip(
+                only_gen, corpus_root, out_dir,
+                build_date=build_date, fetched_at=fetched_at,
+            )
+        )
         return written
 
     if regen_index:
         index_dir = corpus_root / "_index"
         log.info("regenerating corpus index → %s", index_dir)
-        build_index(corpus_root, index_dir)
+        build_index(corpus_root, index_dir, build_date=build_date)
 
     for gen in _discover_gens(corpus_root):
-        written.append(build_gen_zip(gen, corpus_root, out_dir))
+        written.append(
+            build_gen_zip(
+                gen, corpus_root, out_dir,
+                build_date=build_date, fetched_at=fetched_at,
+            )
+        )
 
     # Copy index + attribution from corpus into release dir.
     for fname in ("INDEX.md", "index.json"):
@@ -277,5 +362,8 @@ def build_release(
         shutil.copy2(attr_src, attr_dest)
         written.append(attr_dest)
 
-    written.append(_build_mega_bundle(out_dir))
+    if not skip_mega:
+        written.append(_build_mega_tarxz(
+            corpus_root, out_dir, build_date, fetched_at=fetched_at,
+        ))
     return written

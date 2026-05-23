@@ -15,6 +15,7 @@ from electric_sheep_fold import __version__
 from electric_sheep_fold.layout import flam3_path, remote_url
 from electric_sheep_fold.manifest import MissingSet
 from electric_sheep_fold.migration import migrate_v0_1_if_needed
+from electric_sheep_fold.migration import verify_chunked_consistency
 from electric_sheep_fold.unseal import verify_unseal_consistency
 
 log = logging.getLogger(__name__)
@@ -87,8 +88,15 @@ def fetch_range(
     divergences = verify_unseal_consistency(corpus_root)
     if divergences:
         raise RuntimeError(
-            f"corpus consistency check failed: {divergences}. "
+            f"unseal consistency check failed: {divergences}. "
             "Run `sheep-fold unseal --all` first."
+        )
+
+    chunked_div = verify_chunked_consistency(corpus_root)
+    if chunked_div:
+        raise RuntimeError(
+            f"chunked consistency check failed: {chunked_div}. "
+            "Run `sheep-fold migrate-chunked` first."
         )
 
     migrate_v0_1_if_needed(corpus_root, gen)

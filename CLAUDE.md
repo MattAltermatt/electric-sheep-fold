@@ -97,30 +97,49 @@ These must NOT be violated without a deliberate spec update:
   the ES attribution scheme — never rename, never strip, never re-encode.
 - **Tool license:** GPL-3.0-or-later (matches pyr3, matches flam3 upstream).
   Corpus data is CC per ES policy — see [`README.md`](README.md).
-- **Loose-corpus, append-only** (v0.3 — supersedes v0.2.x sealed-zip
-  invariants). `corpus/{gen}/` is a flat dir of `electricsheep.{gen}.{id}.flam3`
-  files + a `missing.txt`. Mutated only by `fetch-all` / `import` (append a
-  flam3 OR append an id to `missing.txt`). Never deleted (the one-time `unseal`
-  consumed the v0.2 sealed zips). Same shape for live + dead gens; the gen's
-  biography is no longer encoded in the data layout.
-- **Release-built on demand.** Release zips live in `build/release/`, never
-  `corpus/`. `sheep-fold release-build` reads loose corpus → emits
-  `build/release/gen-{N}.zip` (containing `MANIFEST.csv` + `missing.txt` +
-  flat `.flam3` files) + `corpus-all.zip` mega-bundle. Pure derivative;
-  deterministic from corpus state (modulo timestamps). Re-runnable.
-- **Daemon-verified id counts post-migration.** The one-time `unseal` writes
-  `corpus/_unseal-verified.json` recording `loose_count` + `missing_count`
-  per gen. `fetch-all` calls `verify_unseal_consistency` at startup; if any
-  gen diverges (file count drift, missing.txt overwrite, partial restore),
-  the daemon refuses to start with a "run unseal first" message. Guards
-  against silent re-fetch of known ids after a botched migration.
-- **MANIFEST.csv + missing.txt are the release seam:** every release zip
-  contains `MANIFEST.csv` (11-col schema from v0.2 spec §4.1, still authoritative)
-  + `missing.txt` (sticky-404 ids, id-per-line). The pyr3-facing index
-  aggregates from both. Schema in
-  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1
-  (manifest) and
-  [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (release artifact).
+- **Chunked-bucket layout, append-only** (v0.4 — supersedes v0.3 flat).
+  `corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3` where
+  `bucket = f"{(id // 10000) * 10000:05d}"`. `missing.txt` stays at
+  `corpus/{gen}/missing.txt` (one per gen, not per bucket). Mutated only
+  by `fetch-all` / `import` (append a flam3 OR append an id to
+  `missing.txt`). Never deleted. Same shape for live + dead gens; the
+  gen's biography is no longer encoded in the data layout. v0.4
+  `bucket_for()` + `flam3_path()` in `layout.py` are the single source
+  of truth for path construction.
+- **Dated, overlay-compatible release artifacts.** Built on demand into
+  `build/release/`, never `corpus/`. `sheep-fold release-build [--date YYYY-MM-DD]`
+  emits:
+  - `gen-{N}-{date}.zip` per gen — ZIP DEFLATE-9, members:
+    `MANIFEST.csv` + `missing.txt` + `{bucket}/electricsheep.{N}.{id}.flam3`.
+  - `corpus-all-{date}.tar.xz` mega-bundle — LZMA preset 6, full corpus
+    tree including `_index/` + `ATTRIBUTION.md`.
+  **Overlay invariant** (load-bearing — `test_release.py::TestOverlayInvariant`):
+  extracting a per-gen zip under `{gen}/` produces the same on-disk
+  subtree as extracting the mega-bundle then taking the matching subset.
+  Consumers can grab piecemeal OR all-in-one and they fit together.
+- **Daemon-verified chunked layout.** `sheep-fold migrate-chunked`
+  reshapes v0.3 flat → v0.4 chunked (idempotent, SIGKILL-safe `os.replace`)
+  and writes `corpus/_chunked-verified.json` (per-gen `loose_count` +
+  `missing_count` + `bucket_count`). `fetch-all` startup calls both
+  `verify_unseal_consistency` (v0.2 sentinel) and
+  `verify_chunked_consistency` (v0.4); if any gen has flat `.flam3`
+  files at the gen root the daemon refuses to start with "run
+  migrate-chunked first."
+- **Index v0.4 envelope:** `corpus/_index/index.json` is an object
+  `{_schema_version: 4, _build_date: "YYYY-MM-DD", genomes: [...]}`.
+  jq recipes use `.genomes[]`, not `.[]`. Five new pyr3 AutoRoute
+  GPU-safety fields per genome (`has_hyper_trig`, `has_edisc`,
+  `max_abs_affine_coef`, `xform_count_post_symmetry`,
+  `has_density_estimator`) — see
+  [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md).
+- **MANIFEST.csv + missing.txt are the release seam:** every per-gen
+  release zip contains `MANIFEST.csv` (11-col schema from v0.2 spec
+  §4.1, still authoritative — unchanged through v0.4) + `missing.txt`
+  (sticky-404 ids, id-per-line). The pyr3-facing index aggregates from
+  both. Schemas in:
+  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1 (manifest),
+  [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (v0.3 release artifact),
+  [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) (v0.4 chunked + dated + index v4).
 
 ## Where things live
 
@@ -129,11 +148,11 @@ These must NOT be violated without a deliberate spec update:
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network
 - `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.
-- `scripts/` — preservation scripts for dead gens:
-  - `scrape_archive_gen.py` — enum + discover + sweep against electricsheep.com
-  - `preserve_archived_sheep.sh` — parallel driver across multiple gens
-  - `sanitize_scrape_dir.py` — scrub `none` / empty / HTML files into missing.txt
-  - `seed_scrape_from_local.sh` — preseed scrape dirs from a local sheep archive
-  These are *operational* tools, kept until each gen is fully preserved.
+- `scripts/` — operational helpers: `build_release.sh` (release artifact
+  assembly), `resume_live_fetch.sh` (background daemon resumption),
+  `watch_sweep.sh` (sweep progress monitor). Dead-gen preservation scripts
+  were removed in v0.4 after all 8 dead flam3-bearing gens were fully
+  preserved (2026-05-21); see `docs/operations.md` §Preserve a new dead
+  generation for recovery from git history if ES ever rolls a new dead gen.
 - `docs/superpowers/specs/` — design specs
 - `docs/superpowers/plans/` — implementation plans

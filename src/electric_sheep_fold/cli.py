@@ -12,6 +12,10 @@ from electric_sheep_fold.importer import import_dir
 from electric_sheep_fold.index import build_index
 from electric_sheep_fold.layout import LIVE_GENS
 from electric_sheep_fold.manifest import MissingSet
+from electric_sheep_fold.migration import (
+    migrate_v3_to_v4_chunked,
+    verify_chunked_consistency,
+)
 from electric_sheep_fold.release import build_release
 from electric_sheep_fold.unseal import (
     unseal_all,
@@ -52,9 +56,9 @@ def _require_live_gen(gen: int) -> None:
         allowed = ", ".join(str(g) for g in sorted(LIVE_GENS))
         raise typer.BadParameter(
             f"--gen {gen} is not a live gen; v3d0.sheepserver.net only serves "
-            f"{{{allowed}}}. For dead gens, use "
-            "`python scripts/scrape_archive_gen.py --gen N` followed by "
-            "`sheep-fold import <scrape-dir> --gen N`."
+            f"{{{allowed}}}. To preserve a new dead gen, recover the "
+            "archive-scrape scripts from git history (see "
+            "docs/operations.md §Preserve a new dead generation)."
         )
 
 
@@ -162,25 +166,40 @@ def release_build_cmd(
     out: Path = typer.Option(
         Path("./build/release"),
         "--out",
-        help="Where to write gen-*.zip + corpus-all.zip + index + attribution.",
+        help="Where to write gen-*-DATE.zip + corpus-all-DATE.tar.xz + index + attribution.",
     ),
     gen: int | None = typer.Option(
         None,
         "--gen",
         help="Build only this gen's zip (skip mega-bundle + index regen).",
     ),
+    date_str: str | None = typer.Option(
+        None,
+        "--date",
+        help="Build date stamped into artifact filenames (YYYY-MM-DD). Defaults to today UTC.",
+    ),
 ) -> None:
-    """Build the GitHub Release artifact set from corpus state.
+    """Build the v0.4 GitHub Release artifact set from corpus state.
 
-    Reads loose .flam3 files (v0.3) or sealed transit zips (v0.2 bridge),
-    plus missing.txt; writes gen-{N}.zip + corpus-all.zip + INDEX.md +
+    Reads v0.4 chunked corpus + missing.txt; emits ``gen-{N}-{date}.zip``
+    per gen + ``corpus-all-{date}.tar.xz`` mega-bundle + INDEX.md +
     index.json + ATTRIBUTION.md to --out. Re-runnable; deterministic
     output (modulo zip member timestamps).
     """
+    from datetime import date as _date, datetime as _dt
+
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if not corpus.exists():
         raise typer.BadParameter(f"corpus dir not found: {corpus}")
-    written = build_release(corpus, out, only_gen=gen)
+
+    build_date: _date | None = None
+    if date_str is not None:
+        try:
+            build_date = _dt.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise typer.BadParameter(f"--date must be YYYY-MM-DD: {e}") from e
+
+    written = build_release(corpus, out, only_gen=gen, build_date=build_date)
     typer.echo(f"\nwrote {len(written)} files to {out}:")
     for p in written:
         typer.echo(f"  {p.name}")
@@ -301,6 +320,50 @@ def verify_unseal_cmd(
     raise typer.Exit(code=1)
 
 
+@app.command("migrate-chunked")
+def migrate_chunked_cmd(
+    corpus: Path = typer.Option(Path("./corpus"), "--corpus"),
+) -> None:
+    """v0.3 flat → v0.4 chunked layout. One-shot, idempotent.
+
+    Moves every ``corpus/{gen}/electricsheep.{gen}.{id}.flam3`` into
+    ``corpus/{gen}/{bucket}/`` (per-10k floor-bucket). Writes
+    ``corpus/_chunked-verified.json`` as the daemon-resume baseline.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not corpus.is_dir():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+    results = migrate_v3_to_v4_chunked(corpus)
+    for r in results:
+        typer.echo(
+            f"gen {r.gen}: moved {r.moved}, already_chunked {r.already_chunked}, "
+            f"loose_total {r.loose_count}, missing {r.missing_count}, "
+            f"buckets {r.bucket_count}"
+        )
+    typer.echo("ok: _chunked-verified.json written")
+
+
+@app.command("verify-chunked")
+def verify_chunked_cmd(
+    corpus: Path = typer.Option(Path("./corpus"), "--corpus"),
+) -> None:
+    """Compare current on-disk state to ``_chunked-verified.json``.
+
+    Exits nonzero if any gen has residual flat .flam3 files or has
+    shrunk below the post-migrate baseline.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not corpus.is_dir():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+    divergences = verify_chunked_consistency(corpus)
+    if not divergences:
+        typer.echo("ok: all gens consistent with _chunked-verified.json")
+        return
+    for gen, reason in divergences:
+        typer.echo(f"  gen {gen}: {reason}")
+    raise typer.Exit(code=1)
+
+
 @app.command()
 def status(
     gen: int = typer.Option(248),
@@ -315,7 +378,7 @@ def status(
     ms = MissingSet(gen_root / "missing.txt")
     ms.load()
 
-    loose_count = sum(1 for _ in gen_root.glob(f"electricsheep.{gen}.*.flam3"))
+    loose_count = sum(1 for _ in gen_root.rglob(f"electricsheep.{gen}.*.flam3"))
 
     typer.echo(
         f"{gen}: {loose_count} loose flam3 · {len(ms)} known-missing"

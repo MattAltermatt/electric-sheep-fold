@@ -16,7 +16,7 @@ def _drop_flam3(src: Path, gen: int, sheep_id: int, content: bytes = b"<flame/>"
     return dest
 
 
-class TestImportFlatDir:
+class TestImportChunked:
     def test_single_file(self, tmp_path: Path):
         src = tmp_path / "src"
         corpus = tmp_path / "corpus"
@@ -38,17 +38,19 @@ class TestImportFlatDir:
         for sid in (100, 5_500, 15_000):
             assert flam3_path(248, sid, corpus).exists()
 
-    def test_no_chunk_subdirs(self, tmp_path: Path):
-        """v0.3 invariant: no NNNNN-NNNNN subdirs under corpus/{gen}/."""
+    def test_lands_in_per_10k_bucket(self, tmp_path: Path):
+        """v0.4 invariant: corpus/{gen}/{bucket}/ where bucket = (id//10000)*10000."""
         src = tmp_path / "src"
         corpus = tmp_path / "corpus"
         src.mkdir()
         _drop_flam3(src, 248, 100)
+        _drop_flam3(src, 248, 15_000)
         import_dir(src, corpus)
         gen_root = corpus / "248"
-        # Only flat files; no subdirs.
-        subdirs = [p for p in gen_root.iterdir() if p.is_dir()]
-        assert subdirs == []
+        bucket_names = sorted(p.name for p in gen_root.iterdir() if p.is_dir())
+        assert bucket_names == ["00000", "10000"]
+        assert (gen_root / "00000" / "electricsheep.248.00100.flam3").exists()
+        assert (gen_root / "10000" / "electricsheep.248.15000.flam3").exists()
 
 
 class TestImportNested:

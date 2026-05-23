@@ -37,8 +37,8 @@ class TestEnsureCorpusInitialized:
         assert attr.read_text(encoding="utf-8") == "custom"
 
 
-class TestFetchWritesFlat:
-    def test_fetched_file_lands_at_flat_loose_path(self, tmp_path: Path):
+class TestFetchWritesChunked:
+    def test_fetched_file_lands_at_chunked_path(self, tmp_path: Path):
         def handler(req):
             return httpx.Response(200, content=FLAM3)
         client = _build_client(handler)
@@ -49,12 +49,12 @@ class TestFetchWritesFlat:
         assert stats.downloaded == 1
         assert stats.files_written == 1
         dest = flam3_path(248, 100, tmp_path)
-        # v0.3 invariant: corpus/{gen}/electricsheep.{gen}.{id}.flam3, no chunk subdir.
-        assert dest == tmp_path / "248" / "electricsheep.248.00100.flam3"
+        # v0.4 invariant: corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3.
+        assert dest == tmp_path / "248" / "00000" / "electricsheep.248.00100.flam3"
         assert dest.exists()
         assert dest.read_bytes() == FLAM3
 
-    def test_no_chunk_subdir_created(self, tmp_path: Path):
+    def test_only_bucket_subdir_created(self, tmp_path: Path):
         def handler(req):
             return httpx.Response(200, content=FLAM3)
         client = _build_client(handler)
@@ -63,9 +63,10 @@ class TestFetchWritesFlat:
             client=client, delay=0, jitter=0,
         )
         gen_root = tmp_path / "248"
-        # No NNNNN-NNNNN chunk subdir, no sealed zip.
-        chunk_dirs = [p for p in gen_root.iterdir() if p.is_dir()]
-        assert chunk_dirs == []
+        # v0.4 invariant: exactly one bucket dir (per fetched id range), no
+        # sealed zips, no legacy NNNNN-NNNNN chunks.
+        subdirs = [p.name for p in gen_root.iterdir() if p.is_dir()]
+        assert subdirs == ["00000"]
         zips = list(gen_root.glob("*.zip"))
         assert zips == []
 

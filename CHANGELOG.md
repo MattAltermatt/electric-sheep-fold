@@ -1,5 +1,98 @@
 # 📝 Changelog
 
+## v0.4.0 — 2026-05-23
+
+### Phase 12d — chunked corpus layout, dated release artifacts, pyr3 AutoRoute index fields
+
+Three converging pressures resolved in one invariant evolution:
+
+1. **Finder lag + human pattern-recognition** at big-gen scale — gen-244's
+   33,594 files in one flat dir → APFS unbothered but `ls` walls and
+   "what id ranges do we have?" hostile.
+2. **Mega-bundle compression** — v0.3's `corpus-all.zip` ≈ 499 MB across
+   ~166k flames; re-packed as `corpus-all.tar.xz` ≈ 110 MB (−78%). LZMA's
+   cross-file dictionary compounds across redundant flame XML; per-file
+   zip headers prevent that. v0.3 consumers download-and-extract whole,
+   so the "no random-access into the archive" objection no longer bites.
+3. **Pyr3 reparses flame XML to decide CPU vs GPU.** `AutoRoute.kt:73`
+   queries five GPU-safety attributes the index didn't expose; pyr3's
+   BACKLOG literally has an `has_nan_camera` field wishlist entry naming
+   the gap.
+
+**Disk layout** — `corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3`
+where `bucket = (id // 10000) * 10000` zero-padded to 5 digits. Every gen
+chunks the same way; no threshold rule. `missing.txt` stays at
+`corpus/{gen}/missing.txt`.
+
+**Release artifacts (hybrid)** — per-gen ZIP DEFLATE-9 stays optimal for
+small gens (cross-file dictionary saturates within one flame's XML
+anyway); mega-bundle becomes tar.xz where LZMA2 cross-file compounding
+wins decisively:
+
+- **`gen-{N}-{YYYY-MM-DD}.zip`** — ZIP DEFLATE-9, members
+  `MANIFEST.csv` + `missing.txt` + `{bucket}/electricsheep.{N}.{id}.flam3`.
+- **`corpus-all-{YYYY-MM-DD}.tar.xz`** — LZMA preset 6, full corpus tree
+  (per-gen MANIFEST + missing + chunked .flam3 + `_index/` + `ATTRIBUTION.md`).
+- **Overlay invariant** — per-gen zip extracted under `{gen}/` AND
+  mega-bundle extracted into a staging dir produce byte-identical trees
+  in the shared subset. Verified in `test_release.py::TestOverlayInvariant`.
+
+**Index v0.4 envelope** — `index.json` is now an object:
+
+```json
+{
+  "_schema_version": 4,
+  "_build_date": "2026-05-23",
+  "genomes": [<record>, ...]
+}
+```
+
+jq recipes accordingly switch from `.[]` → `.genomes[]`.
+
+**Index v0.4 fields** — five new pyr3 AutoRoute GPU-safety attributes per
+genome record, driving `verdict()` without re-parsing flame XML:
+
+| Field | Type | Failure mode it gates |
+|---|---|---|
+| `has_hyper_trig` | bool | tan/sec/csc/cot/tanh/sech/csch/coth — f32 denominator cancellation at ±π/2 |
+| `has_edisc` | bool | edisc craters near unit circle → NaN (all-black render) |
+| `max_abs_affine_coef` | float | `> 5` → f32 exponent loss → orbit NaN |
+| `xform_count_post_symmetry` | int | `> 64` overflows GPU chaos pickTable |
+| `has_density_estimator` | bool | soft tone-map gate; GPU lacks HSV-desaturation |
+
+**CLI delta:**
+
+- `sheep-fold migrate-chunked` — **new.** One-shot v0.3 flat → v0.4
+  chunked migration. Idempotent. Writes `corpus/_chunked-verified.json`
+  as the daemon-resume baseline.
+- `sheep-fold verify-chunked` — **new.** Consistency check against the
+  baseline (exits nonzero on residual flat files or shrinkage).
+- `sheep-fold release-build --date YYYY-MM-DD` — **new flag.** Stamps
+  the date into artifact filenames + `index.json._build_date`.
+  Defaults to today UTC.
+
+**Daemon-resume guard** — `fetch-all` startup now refuses to start if
+any gen has flat `.flam3` files at the gen root (signals incomplete
+migration). Bypasses cleanly on fresh / fully-chunked corpora.
+
+**Code shape:** ~600 LOC added (~250 in `release.py` for tar.xz + chunked
+zips, ~200 in `index.py` for the 5 new fields + schema envelope, ~150 in
+`migration.py` for the v3→v4 migration), 207/207 tests green.
+
+**Retired invariants** (superseded; see [`CLAUDE.md`](CLAUDE.md)):
+
+- Loose-corpus flat layout
+- Single-shape release artifact filenames (no date)
+- `index.json` as a flat JSON array
+
+**New invariants:**
+
+- Chunked-bucket layout (`{gen}/{bucket}/`)
+- Dated release artifacts + overlay invariant
+- `index.json` v0.4 envelope with `_schema_version: 4` + `_build_date`
+- Per-gen ZIP + mega-bundle tar.xz hybrid; consumers grab piecemeal OR
+  bulk and trees fit together
+
 ## v0.3.0 — 2026-05-22
 
 ### Phase 12b — loose-corpus separation; release artifact built on demand

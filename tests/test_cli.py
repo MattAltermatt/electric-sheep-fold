@@ -112,8 +112,9 @@ class TestLiveGenGuard:
         )
         assert result.exit_code != 0
         assert "not a live gen" in result.output
-        # v0.3 hint mentions `import --gen N` instead of the retired `--whole-gen`
-        assert "import" in result.output
+        # v0.4 hint points to operations.md (archive-scrape scripts removed,
+        # recoverable from git history if ES ever rolls a new dead gen).
+        assert "operations.md" in result.output
 
     @pytest.mark.parametrize("dead_gen", [165, 244])
     def test_fetch_all_rejects_dead_gen(self, tmp_path: Path, dead_gen: int):
