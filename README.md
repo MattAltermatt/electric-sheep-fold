@@ -65,9 +65,11 @@ for query recipes — find flames by variation, pyr3-parity filtering, the
 | 243 | 5,266 | 5,132 | 134 | electricsheep.com archive |
 | 244 | 33,594 | 7,430 | 26,164 | electricsheep.com archive |
 | 245 | 11,950 | 1,213 | 10,737 | electricsheep.com archive |
-| 247 | 9,861 | 4,501 | 5,360 | v3d0 + archive |
-| 248 | 2,926 | 1,416 | 1,510 | v3d0.sheepserver.net (live) |
-| **Σ** | **143,307** | **41,200** | **102,107** | |
+| 247 | 17,396 | 7,781 | 9,615 | v3d0 + archive |
+| 248 | 18,698 | 9,220 | 9,478 | v3d0.sheepserver.net (live) |
+| **Σ** | **166,614** | **52,284** | **114,330** | |
+
+Counts as of the latest [Release](https://github.com/MattAltermatt/electric-sheep-fold/releases/latest); gens 247 + 248 grow over time as the live server publishes new flames.
 
 **Kinds** (in `index.json`): each `.flam3` is `genome` (single-flame, fully
 indexed — default for agentic / pyr3 lookups), `animation` (multi-flame
@@ -89,20 +91,19 @@ sheep-fold --help
 |---|---|
 | `sheep-fold fetch RANGE` | Polite range fetch from v3d0 (live gens 247, 248 only) |
 | `sheep-fold fetch-all` | Polite full-gen fetch from v3d0 (resumable) |
-| `sheep-fold import DIR` | Import existing local `.flam3`s into `corpus/{gen}/` (flat loose) |
+| `sheep-fold import DIR` | Import existing local `.flam3`s into `corpus/{gen}/{bucket}/` |
 | `sheep-fold index` | Rebuild `corpus/_index/{index.json, INDEX.md}` (agent-queryable) |
-| `sheep-fold status` | Show per-gen loose-file + missing counts |
-| `sheep-fold release-build` | Build `build/release/gen-{N}.zip` + `corpus-all.zip` from corpus state |
-| `sheep-fold unseal` / `verify-unseal` | One-time v0.2 → v0.3 migration + consistency check |
+| `sheep-fold status` | Show per-gen file + missing counts |
+| `sheep-fold release-build [--date YYYY-MM-DD]` | Build `build/release/gen-{N}-{date}.zip` + `corpus-all-{date}.tar.xz` from corpus state |
+| `sheep-fold migrate-chunked` / `verify-chunked` | v0.4 chunked-layout migration (idempotent) + consistency guard |
+| `sheep-fold unseal` / `verify-unseal` | Historical v0.2 → v0.3 sealed-zip unwind (one-shot; preserved for archival re-runs) |
 | `./scripts/build_release.sh` | Thin wrapper around `sheep-fold release-build` for the next GH Release |
 
-For dead generations (165 / 169 / 191 / 198 / 242 / 243 / 244 / 245), the
-archive scraper handles preservation:
-
-```sh
-python scripts/scrape_archive_gen.py --gen 244 --out corpus/_scrape-244
-sheep-fold import corpus/_scrape-244
-```
+For new dead generations (if Electric Sheep rolls one in the future), the
+archive-scraper scripts have been retired from the working tree but are
+recoverable from git history — see [`docs/operations.md`](docs/operations.md)
+§"Preserve a new dead generation". The current 8 dead gens (165 / 169 /
+191 / 198 / 242 / 243 / 244 / 245) are fully preserved as of 2026-05-21.
 
 ## Politeness
 
@@ -124,7 +125,8 @@ gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).
   [v0.1](docs/superpowers/specs/2026-05-19-electric-sheep-fold-v0.1-design.md) ·
   [v0.2 chunked-zip](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) ·
   [v0.2.1 dead-gen whole-zip](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md) ·
-  [v0.3 loose corpus](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md)
+  [v0.3 loose corpus](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) ·
+  [v0.4 chunked + dated + AutoRoute index](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md)
 
 ## License
 
