@@ -4,17 +4,19 @@
 
 ```sh
 uv pip install -e ".[dev]"         # editable install + pytest
-pytest -q                          # full test suite (~170 tests, no real network)
-sheep-fold --help                  # CLI entry — fetch / fetch-all / import / status / index / release-build / unseal
+pytest -q                          # full test suite (~207 tests, no real network)
+sheep-fold --help                  # CLI: fetch · fetch-all · import · status · index · release-build · migrate-chunked · verify-chunked · unseal · verify-unseal
 sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
-./scripts/build_release.sh         # assemble build/release/{gen-*.zip, corpus-all.zip, ...} for a Release upload
+sheep-fold release-build --date YYYY-MM-DD   # build/release/{gen-N-DATE.zip, corpus-all-DATE.tar.xz, …}
+./scripts/build_release.sh         # thin wrapper around `release-build` for the next GH Release upload
 ```
 
 **What this repo is:** the preserved Electric Sheep `.flam3` corpus, with
 the `sheep-fold` toolchain as its build/maintain pipeline. The corpus
-itself is published as GitHub Releases (per-gen zips + `corpus-all.zip`
-mega-bundle + `INDEX.md` + `index.json` + `ATTRIBUTION.md`). The git tree
-holds the tooling + docs; corpus data is gitignored and lives in Releases.
+itself is published as GitHub Releases tagged by ISO build date — per-gen
+`gen-{N}-{date}.zip` + `corpus-all-{date}.tar.xz` mega-bundle + `INDEX.md`
++ `index.json` + `ATTRIBUTION.md`. The git tree holds the tooling + docs;
+corpus data is gitignored and lives in Releases.
 
 Agentic queries against the corpus are documented in
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
@@ -48,31 +50,24 @@ These must NOT be violated without a deliberate spec update:
     jitter, **strictly sequential**, identifiable User-Agent. The live server
     generates fresh genomes; treat it as expensive and rare. No parallelism.
   - **Static archive (`electricsheep.com/archives/...`):** 2s ±1s jitter per
-    worker, **modest cross-gen parallelism allowed** (default 4 workers via
-    `scripts/preserve_archived_sheep.sh`). AWS-backed; aggregate ~few req/s
-    is gentle. Never run live + archive at the same time — finish the live
-    op first.
-- **Live-vs-dead gen scope:** the live tool (`sheep-fold fetch` / `fetch-all`)
-  is hard-restricted to `LIVE_GENS = {247, 248}` in `layout.py`; any other
-  `--gen` value errors out with a hint to use the archive scraper. Extending
-  the set (e.g. when ES rolls gen 249) is a deliberate one-line edit. **Dead, flam3-bearing gens** (165, 169, 191, 198, 242,
-  243, 244, 245) are preserved by `scripts/scrape_archive_gen.py` which runs
-  three phases per gen against `electricsheep.com/archives`:
-  1. **Time-page enumeration (optional)** — harvest ids linked from
-     `time/*.html`. Partial: gen 244's time view stops at id 31,999 even
-     though sheep exist up to id 86,435+. Gens 165 + 169 have NO time view
-     at all (404); phase 1 falls through to phase 2 — discovery is what
-     actually finds the upper bound, time pages are just a free preseed.
-  2. **Upper-bound discovery** — doubling probe + windowed binary search via
-     `spex` to find the highest valid sheep id. Cached.
-  3. **Gap sweep** — for every id in `[0, max_id]` not on disk and not in
-     `_missing_404.txt`, GET `spex`. Accept only valid flam3 (see
-     `is_flam3_content`); 404 / `none\n` / non-flam3 → record missing.
-  Output → `sheep-fold import` (writes flat `.flam3` files into
-  `corpus/{gen}/` + merges `_missing_404.txt` → `corpus/{gen}/missing.txt`).
-  All eight dead flam3 gens listed above are fully preserved as of
-  2026-05-21 (see `CHANGELOG.md` for counts); the preservation scripts are
-  now quiescent and can be removed if needed.
+    worker, **modest cross-gen parallelism allowed** (4 workers historically).
+    AWS-backed; aggregate ~few req/s is gentle. Never run live + archive at
+    the same time — finish the live op first.
+- **Live-vs-dead gen scope:** the live tool (`sheep-fold fetch` /
+  `fetch-all`) is hard-restricted to `LIVE_GENS = {247, 248}` in
+  `layout.py`; any other `--gen` value errors out. Extending the set
+  (when ES rolls gen 249) is a deliberate one-line edit. All eight dead
+  flam3-bearing gens (165, 169, 191, 198, 242, 243, 244, 245) were fully
+  preserved by 2026-05-21 via `scripts/scrape_archive_gen.py` (now
+  retired); the workflow ran three phases per gen against
+  `electricsheep.com/archives` — time-page enumeration → upper-bound
+  discovery (doubling probe + binary search via `spex`) → gap sweep with
+  flam3-envelope validation. Output fed `sheep-fold import` (writes
+  chunked `.flam3` files into `corpus/{gen}/{bucket}/` + merges
+  `_missing_404.txt` → `corpus/{gen}/missing.txt`). If ES rolls a NEW
+  dead gen (e.g. 249 ends and becomes static), recover the scraper
+  scripts via `git show v0.3.0:scripts/scrape_archive_gen.py` etc. — see
+  [`docs/operations.md`](docs/operations.md) §"Preserve a new dead generation".
 - **MPG-only generations are permanently out of scope.** `old`, `very-old`,
   and gen `23` are video-only on the archive — content-addressed by MD5 hash
   under `archives/{old,very-old}/...` (not `generation-N/`), no `spex`
@@ -150,15 +145,18 @@ These must NOT be violated without a deliberate spec update:
 ## Where things live
 
 - `src/electric_sheep_fold/` — `layout`, `manifest`, `extract`, `fetch`,
-  `importer`, `migration`, `release`, `unseal`, `cli`
+  `importer`, `migration`, `index`, `release`, `unseal`, `cli`
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
-- `tests/` — pytest suites; pure / mock-driven, no real network
-- `corpus/` — local data (gitignored). Auto-materialized on first `fetch`.
+- `tests/` — pytest suites; pure / mock-driven, no real network (~207 tests)
+- `corpus/` — local data (gitignored, chunked layout). Auto-materialized
+  on first `fetch`.
+- `build/release/` — derived release artifacts (gitignored, rebuilt by
+  `sheep-fold release-build`).
 - `scripts/` — operational helpers: `build_release.sh` (release artifact
   assembly), `resume_live_fetch.sh` (background daemon resumption),
   `watch_sweep.sh` (sweep progress monitor). Dead-gen preservation scripts
   were removed in v0.4 after all 8 dead flam3-bearing gens were fully
-  preserved (2026-05-21); see `docs/operations.md` §Preserve a new dead
-  generation for recovery from git history if ES ever rolls a new dead gen.
-- `docs/superpowers/specs/` — design specs
+  preserved (2026-05-21); see `docs/operations.md` §"Preserve a new dead
+  generation" for recovery from git history if ES ever rolls a new dead gen.
+- `docs/superpowers/specs/` — design specs (v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4)
 - `docs/superpowers/plans/` — implementation plans
