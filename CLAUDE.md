@@ -32,6 +32,12 @@ index in sync with the corpus.
 - **Branches:** `feature/<topic>` for work. FF-merge to `main` after user verify.
 - **Docs are ship dependencies:** README, VISION, ROADMAP, CHANGELOG, BACKLOG all
   track code. Update in the same commit as the code they describe.
+- **Releases tagged by ISO build date** (`YYYY-MM-DD`), not semver. This is
+  a corpus archive woken occasionally to fetch more sheep + ship; each
+  release is a snapshot in time. Tag = same date stamped into artifact
+  filenames (`corpus-all-{date}.tar.xz`, `gen-{N}-{date}.zip`). Title
+  format: `"Corpus snapshot YYYY-MM-DD"` optionally suffixed with notable
+  changes. Pre-v0.4 tags (v0.1–v0.3) stay on semver as historical markers.
 
 ## Invariants (load-bearing)
 

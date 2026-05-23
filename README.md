@@ -6,14 +6,15 @@
 
 ## Download the corpus
 
-Each Release is a snapshot in time, stamped with its build date in the
-artifact filenames. Latest is **[v0.4.0](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/v0.4.0)**
-(2026-05-23). Three consumer paths, all producing the same on-disk tree
-in the shared subset (overlay invariant):
+Each Release is a corpus snapshot in time, tagged with its ISO build
+date (no semver — this is a data archive, not software versioning).
+Latest is **[2026-05-23](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23)**.
+Three consumer paths, all producing the same on-disk tree in the shared
+subset (overlay invariant):
 
 ```sh
-# Path A — bulk, one mega-bundle (LZMA2; ~110 MB)
-gh release download v0.4.0 -p corpus-all-2026-05-23.tar.xz
+# Path A — bulk, one mega-bundle (LZMA2; ~160 MB)
+gh release download 2026-05-23 -p corpus-all-2026-05-23.tar.xz
 mkdir corpus && cd corpus
 tar -xJf ../corpus-all-2026-05-23.tar.xz
 # Result: corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3
@@ -22,7 +23,7 @@ tar -xJf ../corpus-all-2026-05-23.tar.xz
 
 ```sh
 # Path B — piecemeal, only the gens wanted
-gh release download v0.4.0 -p 'gen-247-*.zip' -p 'gen-248-*.zip'
+gh release download 2026-05-23 -p 'gen-247-*.zip' -p 'gen-248-*.zip'
 mkdir -p corpus/247 corpus/248
 unzip gen-247-2026-05-23.zip -d corpus/247/
 unzip gen-248-2026-05-23.zip -d corpus/248/

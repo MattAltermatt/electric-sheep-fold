@@ -1,6 +1,15 @@
 # 📝 Changelog
 
-## v0.4.0 — 2026-05-23
+> **Release model:** corpus snapshots tagged by ISO build date
+> (`YYYY-MM-DD`) — no semver. Each release is a self-contained snapshot
+> of the corpus + tooling at a point in time. The 2026-05-23 entry below
+> is the first under this convention; prior entries (v0.1–v0.3) kept
+> their original semver tags as historical markers.
+
+## 2026-05-23 — chunked layout + dated artifacts + pyr3 AutoRoute index
+
+(Was v0.4.0 in pre-release planning; renamed to date-tag at ship time
+to match the corpus-snapshot release model.)
 
 ### Phase 12d — chunked corpus layout, dated release artifacts, pyr3 AutoRoute index fields
 
