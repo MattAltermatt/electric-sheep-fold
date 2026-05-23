@@ -15,8 +15,8 @@
 - **Phase 10b — partial unseal for in-progress live chunks** *(2026-05-21)* — `247/00000-09999` + `247/10000-19999` + `248/00000-09999` stay sealed (archive-snapshot final); `247/20000-29999` + `248/10000-19999` unsealed back to working dirs so v3d0 fetch-all can continue extending them.
 - **Phase 11a — corpus index + agentic skill** *(2026-05-21)* — `sheep-fold index` builds `corpus/_index/{index.json,INDEX.md}` with per-flame structural metadata + pyr3-limitation flags; `.claude/skills/pyr3-corpus-index/SKILL.md` documents `jq` query recipes. First build: 142,453 flames, 40,790 genomes, 99 distinct variations.
 - **Phase 11b — v0.2.2 corpus-first pivot + Release distribution** *(2026-05-21)* — repo refocused: the corpus IS the deliverable, tooling is the means. GitHub Releases supersede LFS / separate-repo plans. Chunk shape unified to whole-gen for all gens (live + dead); v0.2.1 live-vs-dead split dropped. `scripts/build_release.sh` assembles per-gen `gen-{N}.zip` + `corpus-all.zip` mega-bundle + index + attribution. First snapshot Release: `v0.2.2` with 142,452 flames across 10 gens.
-- **Phase 12b — v0.3 loose-corpus separation** *(2026-05-22)* — separated on-disk corpus from release artifact. `corpus/{gen}/` is now flat `.flam3` files + `missing.txt` for ALL gens; `build/release/` holds zips built on demand via `sheep-fold release-build`. Retired `seal` / `chunk` / sealed-immutable invariants. One-time `sheep-fold unseal --all` migrated the 10 whole-gen zips clean: 143,307 loose files across 10 gens, 74,029 sticky-404 entries preserved. `missing.txt` now travels inside the release zip alongside `MANIFEST.csv` — v0.2.2-class sticky-404 loss can't recur. Spec: [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md).
-- **Phase 12d — chunked layout + dated release + pyr3 AutoRoute index fields** *(2026-05-23)* — `corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3` where `bucket = (id // 10000) * 10000` zero-padded. Hybrid release: per-gen `gen-{N}-{date}.zip` (ZIP DEFLATE-9) + `corpus-all-{date}.tar.xz` (LZMA preset 6, −78% vs zip) with overlay invariant (per-gen + mega-bundle extract to identical trees in their shared subset). `index.json` envelope `{_schema_version: 4, _build_date, genomes: [...]}` carrying 5 pyr3 GPU-safety fields driving `AutoRoute.verdict()`: `has_hyper_trig`, `has_edisc`, `max_abs_affine_coef`, `xform_count_post_symmetry`, `has_density_estimator`. New `sheep-fold migrate-chunked` + `verify-chunked` CLI; `release-build --date YYYY-MM-DD` flag. Spec: [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md). 207/207 tests green. **Release model pivot:** future releases tagged by ISO date (`YYYY-MM-DD`), not semver — this one published as tag [`2026-05-23`](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23). Pre-v0.4 semver tags kept as historical markers.
+- **Phase 12b — v0.3 loose-corpus separation** *(2026-05-22, tag `v0.3.0`)* — see [CHANGELOG](CHANGELOG.md#v030--2026-05-22).
+- **Phase 12d — v0.4 chunked layout + dated release + pyr3 AutoRoute index** *(2026-05-23, tag [`2026-05-23`](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23))* — also the **release-model pivot to ISO-date tags**. See [CHANGELOG](CHANGELOG.md#2026-05-23--chunked-layout--dated-artifacts--pyr3-autoroute-index).
 
 ## 🔮 Next phases
 
@@ -36,10 +36,11 @@ pyr3 reads `corpus/{gen}/` (loose files + index) as parity-test source. The poin
 
 Run `sheep-fold fetch-all --gen 249` (etc.) as ES rolls over. One-line edit to extend `LIVE_GENS` in `layout.py`; no other code changes.
 
-## 🚧 Todos (next session)
+## 🚧 Todos (next wake-up)
 
-- ✅ **Shipped 2026-05-23** as GitHub Release tag [`2026-05-23`](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23) with all dated artifacts. Branch `feature/v0.4-chunked-dated-release-and-index` FF-merged + deleted. 207/207 tests green.
-- 🐑 **Next wake-up:** fetch more sheep (extend gens 247 + 248), `migrate-chunked` only if needed (idempotent), `release-build --date YYYY-MM-DD`, `gh release create YYYY-MM-DD`. Project is wake-on-demand, not continuous daemon.
-- Phase 13 (pyr3 integration) — pyr3 reads `corpus/{gen}/{bucket}/` + new AutoRoute index fields as parity-test source.
+This is a corpus archive woken occasionally to fetch more sheep + ship a dated snapshot. No continuous-daemon expectation.
+
+- 🐑 **Routine refresh:** `./scripts/resume_live_fetch.sh <upper>` to extend gens 247 + 248 → `sheep-fold index` → `sheep-fold release-build --date YYYY-MM-DD` → `gh release create YYYY-MM-DD`. `migrate-chunked` is a no-op on already-chunked corpus.
+- Phase 13 (pyr3 integration) — pyr3 reads `corpus/{gen}/{bucket}/` + AutoRoute index fields as parity-test source. Lives outside this repo.
 - 🔮 **If ES rolls a new dead gen** (e.g. 249 ends and becomes static): recover archive-scraper scripts via `git show v0.3.0:scripts/scrape_archive_gen.py` etc. — see [`docs/operations.md`](docs/operations.md) §Preserve a new dead generation.
-- Phase 12c (index ergonomics) — pull forward when corpus-growth slows or pyr3 integration demands faster queries.
+- Phase 12c (index ergonomics — SQLite, palette-hash, incremental rebuild) — pull forward when corpus-growth slows or pyr3 integration demands faster queries.
