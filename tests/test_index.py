@@ -71,7 +71,7 @@ class TestParseFlame:
         assert rec["variations"] == ["julia", "linear"]
         assert rec["has_final_xform"] is False
         assert rec["has_post_affine"] is False
-        assert rec["has_chaos"] is False
+        assert rec["has_xaos"] is False
         assert rec["supersample"] == 1
         assert rec["highlight_power"] == -1
         assert rec["negative_weight_xforms"] == 0
@@ -82,6 +82,10 @@ class TestParseFlame:
         assert rec["final_xform_var_count"] is None
         assert rec["has_post_affine_per_xform"] == [False, False]
         assert rec["max_xform_weight"] == 1.0
+        # v0.5: clean genome has neither nan flag and symmetry_kind is null.
+        assert rec["has_nan_camera"] is False
+        assert rec["has_nan_in_xforms"] is False
+        assert rec["symmetry_kind"] is None
 
     def test_rich_genome_pyr3_flags(self):
         rec = parse_flame(GENOME_RICH, 248, 200)
@@ -98,7 +102,7 @@ class TestParseFlame:
         assert rec["symmetry_kind"] == 2
         assert rec["has_final_xform"] is True
         assert rec["has_post_affine"] is True
-        assert rec["has_chaos"] is True
+        assert rec["has_xaos"] is True
         assert rec["negative_weight_xforms"] == 1
         # The final xform's linear should also be picked up
         assert "linear" in rec["variations"]
@@ -244,8 +248,8 @@ class TestBuildIndex:
         index_path = out_dir / "index.json"
         assert index_path.exists()
         envelope = json.loads(index_path.read_text())
-        # v0.4 envelope
-        assert envelope["_schema_version"] == 4
+        # v0.5 envelope
+        assert envelope["_schema_version"] == 5
         assert isinstance(envelope["_build_date"], str)
         records = envelope["genomes"]
         assert len(records) == 3
@@ -284,7 +288,7 @@ class TestBuildIndex:
         genomes = [r for r in records if r["kind"] == "genome"]
         parity_friendly = [
             r for r in genomes
-            if not r["has_chaos"]
+            if not r["has_xaos"]
             and r["supersample"] == 1
             and r["highlight_power"] < 0
         ]
@@ -411,7 +415,7 @@ class TestPyr3AutoRouteFields:
         assert rec["has_density_estimator"] is False
 
 
-class TestIndexSchemaV4:
+class TestIndexSchemaV5:
     def test_envelope_has_schema_version_and_build_date(self, tmp_path: Path):
         corpus = tmp_path / "corpus"
         (corpus / "247" / "00000").mkdir(parents=True)
@@ -422,7 +426,7 @@ class TestIndexSchemaV4:
         build_index(corpus, out_dir, build_date=date(2026, 5, 23))
 
         env = json.loads((out_dir / "index.json").read_text())
-        assert env["_schema_version"] == INDEX_SCHEMA_VERSION == 4
+        assert env["_schema_version"] == INDEX_SCHEMA_VERSION == 5
         assert env["_build_date"] == "2026-05-23"
         assert "genomes" in env
         assert isinstance(env["genomes"], list)
@@ -436,3 +440,87 @@ class TestIndexSchemaV4:
         # Just verify it parses as a date in the expected shape
         assert len(env["_build_date"]) == 10
         assert env["_build_date"][4] == "-"
+
+    def test_schema_version_is_v5(self, tmp_path: Path):
+        """Explicit v0.5 schema-version assertion against an empty corpus."""
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        out_dir = tmp_path / "out"
+        build_index(corpus, out_dir)
+        data = json.loads((out_dir / "index.json").read_text())
+        assert data["_schema_version"] == 5
+
+
+# ----- v0.5 malformation flags + symmetry_kind null + has_xaos rename --------
+
+
+GENOME_NAN_CAMERA = (
+    b'<flame name="nan-cam" size="100 100" center="nan nan" scale="nan">'
+    b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_NAN_IN_XFORM_COEFS = (
+    b'<flame name="nan-xform" size="100 100" center="0 0" scale="100">'
+    b'  <xform weight="1" linear="1" coefs="1 nan 0 1 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_NAN_IN_FINALXFORM_POST = (
+    b'<flame name="nan-final" size="100 100" center="0 0" scale="100">'
+    b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+    b'  <finalxform post="nan 0 0 1 0 0" coefs="1 0 0 1 0 0" linear="1"/>'
+    b'</flame>'
+)
+
+GENOME_NAN_UPPERCASE = (
+    b'<flame name="NaN-upper" size="100 100" center="0 0" scale="100">'
+    b'  <xform weight="1" linear="1" coefs="1 NaN 0 1 0 0"/>'
+    b'</flame>'
+)
+
+GENOME_NAN_FALSE_POSITIVE_GUARD = (
+    b'<flame name="banana unanchored" size="100 100" center="0 0" scale="100">'
+    b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+
+class TestNanFlags:
+    def test_has_nan_camera_true(self):
+        rec = parse_flame(GENOME_NAN_CAMERA, 247, 1)
+        assert rec["has_nan_camera"] is True
+        assert rec["has_nan_in_xforms"] is False
+
+    def test_has_nan_in_xform_coefs_true(self):
+        rec = parse_flame(GENOME_NAN_IN_XFORM_COEFS, 247, 2)
+        assert rec["has_nan_camera"] is False
+        assert rec["has_nan_in_xforms"] is True
+
+    def test_has_nan_in_finalxform_post(self):
+        rec = parse_flame(GENOME_NAN_IN_FINALXFORM_POST, 247, 3)
+        assert rec["has_nan_camera"] is False
+        assert rec["has_nan_in_xforms"] is True
+
+    def test_has_nan_case_insensitive(self):
+        rec = parse_flame(GENOME_NAN_UPPERCASE, 247, 4)
+        assert rec["has_nan_in_xforms"] is True
+
+    def test_has_nan_false_positive_guard(self):
+        rec = parse_flame(GENOME_NAN_FALSE_POSITIVE_GUARD, 247, 5)
+        assert rec["has_nan_camera"] is False
+        assert rec["has_nan_in_xforms"] is False
+
+
+class TestSymmetryKindAlwaysPresent:
+    def test_symmetry_kind_null_when_absent(self):
+        # GENOME_LINEAR has no <symmetry> element.
+        rec = parse_flame(GENOME_LINEAR, 248, 100)
+        assert rec["has_symmetry"] is False
+        assert rec["symmetry_kind"] is None
+
+    def test_symmetry_kind_int_when_present(self):
+        # GENOME_RICH has <symmetry kind="2"/>.
+        rec = parse_flame(GENOME_RICH, 248, 200)
+        assert rec["has_symmetry"] is True
+        assert rec["symmetry_kind"] == 2

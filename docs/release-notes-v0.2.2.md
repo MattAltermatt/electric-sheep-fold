@@ -73,9 +73,6 @@ See `INDEX.md` (Query Recipes section) for the full list. A few quick ones:
 # Find genomes using a specific variation
 jq -r '.[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id' index.json | head
 
-# Find pyr3-parity-friendly genomes (no chaos, supersample=1, default highlight_power)
-jq -r '.[] | select(.kind == "genome" and (.has_chaos | not) and .supersample == 1 and .highlight_power < 0) | .id' index.json | head
-
 # Inspect one flame in full
 jq '.[] | select(.id == "244/42746")' index.json
 ```

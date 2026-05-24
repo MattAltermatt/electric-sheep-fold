@@ -126,12 +126,16 @@ These must NOT be violated without a deliberate spec update:
   `verify_chunked_consistency` (v0.4); if any gen has flat `.flam3`
   files at the gen root the daemon refuses to start with "run
   migrate-chunked first."
-- **Index v0.4 envelope:** `corpus/_index/index.json` is an object
-  `{_schema_version: 4, _build_date: "YYYY-MM-DD", genomes: [...]}`.
-  jq recipes use `.genomes[]`, not `.[]`. Five new pyr3 AutoRoute
+- **Index v0.5 envelope:** `corpus/_index/index.json` is an object
+  `{_schema_version: 5, _build_date: "YYYY-MM-DD", genomes: [...]}`.
+  jq recipes use `.genomes[]`, not `.[]`. Five v0.4 pyr3 AutoRoute
   GPU-safety fields per genome (`has_hyper_trig`, `has_edisc`,
   `max_abs_affine_coef`, `xform_count_post_symmetry`,
-  `has_density_estimator`) — see
+  `has_density_estimator`) carry forward unchanged. v0.5 (2026-05-23)
+  adds parser-detectable malformation flags (`has_nan_camera`,
+  `has_nan_in_xforms`), makes `symmetry_kind` always-present
+  (`int | null`), and renames `has_chaos` → `has_xaos` to match
+  community naming. See
   [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md).
 - **MANIFEST.csv + missing.txt are the release seam:** every per-gen
   release zip contains `MANIFEST.csv` (11-col schema from v0.2 spec
@@ -140,7 +144,8 @@ These must NOT be violated without a deliberate spec update:
   both. Schemas in:
   [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1 (manifest),
   [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (v0.3 release artifact),
-  [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) (v0.4 chunked + dated + index v4).
+  [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) (v0.4 chunked + dated + index v4),
+  [`docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md`](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md) (v0.5 NaN flags + symmetry_kind always-present + has_chaos→has_xaos).
 
 ## Where things live
 
@@ -158,5 +163,5 @@ These must NOT be violated without a deliberate spec update:
   were removed in v0.4 after all 8 dead flam3-bearing gens were fully
   preserved (2026-05-21); see `docs/operations.md` §"Preserve a new dead
   generation" for recovery from git history if ES ever rolls a new dead gen.
-- `docs/superpowers/specs/` — design specs (v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4)
+- `docs/superpowers/specs/` — design specs (v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5)
 - `docs/superpowers/plans/` — implementation plans

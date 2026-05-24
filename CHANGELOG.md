@@ -6,6 +6,60 @@
 > is the first under this convention; prior entries (v0.1–v0.3) kept
 > their original semver tags as historical markers.
 
+## Pending — next dated release
+
+### Phase 12e — index schema v5: malformation flags + xaos rename
+
+Inbound design proposal from pyr3 (sibling repo) flagged ~153 of 149,904
+corpus genomes (≈0.10%; gen-247 worst at ≈0.77%) carry
+`<flame center="nan nan" scale="nan">` — textually invalid floats that no
+flam3-lineage renderer can interpret. Every downstream consumer
+reinvents a luminance-based discard pass to skip these. The structural
+fact now lives in the corpus index. While the schema was being touched,
+two adjacent cleanups landed in the same bump.
+
+**Schema bump v4 → v5.** Consumers MUST check `_schema_version` before
+applying v5 jq paths. No v4-compat shim — same policy as v3→v4.
+
+**New field — `has_nan_camera: bool`.** `True` iff the `<flame>` root
+element has a `center` or `scale` attribute whose value contains a `nan`
+token (case-insensitive, whole-word — regex
+`(?i)(?<![a-z0-9])nan(?![a-z0-9])`). Matches the canonical
+malformation pyr3 named. ~0.1% of corpus (~153 of 149,904 genomes;
+gen-247 worst).
+
+**New field — `has_nan_in_xforms: bool`.** `True` iff any `<xform>` or
+`<finalxform>` attribute value contains a NaN token. Covers affine
+coefs (`coefs`, `post`) and any variation parameter that landed as
+NaN. Same whole-word regex as `has_nan_camera`.
+
+**Changed semantics — `symmetry_kind: int | null`.** Was `int` only
+when `<symmetry>` was present in v4; consumers had to guard `?? 0`
+or `// null` at every read. v5 always emits the field — `int` value
+of the `kind` attribute when present, `null` when no `<symmetry>`
+element. The companion `has_symmetry: bool` is unchanged and stays as
+the cheap predicate.
+
+**Renamed — `has_chaos` → `has_xaos`.** Same value semantics: `True`
+iff any `<xform>` / `<finalxform>` has a `chaos` attribute. The XML
+attribute name in source files is unchanged (still `chaos`); only the
+index field name changes. Community/Apophysis/JWildfire/pyr3 standard
+name is `xaos`, so this collapses the v0.4 dual-naming (v0.4's
+INDEX.md already aliased the heading as `has_chaos (xaos)`).
+
+**Inbound proposal context.** Flags came from pyr3 noticing the
+all-black-render pattern. pyr3 will adopt the existing `has_chaos`
+field name verbatim once renamed — no schema-breaking rename on their
+side either; both repos converge on `has_xaos`.
+
+**Out of scope:** `inf` / `-inf` / `infinity` detection (different
+failure mode — dim output vs all-black — no named consumer); renderer-
+specific quality flags ("renders as single dot," "GPU banding") stay in
+each consumer's divergence log; v4-compat reader (consumers re-pull on
+schema bump).
+
+Spec: [`docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md`](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md).
+
 ## 2026-05-23 — chunked layout + dated artifacts + pyr3 AutoRoute index
 
 (Was v0.4.0 in pre-release planning; renamed to date-tag at ship time

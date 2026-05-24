@@ -3,10 +3,13 @@
 Walks every loose `.flam3` file in `corpus/{gen}/{bucket}/` (the v0.4
 chunked layout) or surviving v0.2 sealed zips during one-shot migration
 windows, parses each, and emits:
-  - `index.json` — v0.4 envelope ``{_schema_version: 4, _build_date,
+  - `index.json` — v0.5 envelope ``{_schema_version: 5, _build_date,
     genomes: [...]}``. Per-genome record carries structural features
     plus 5 pyr3 AutoRoute GPU-safety fields (has_hyper_trig, has_edisc,
-    max_abs_affine_coef, xform_count_post_symmetry, has_density_estimator).
+    max_abs_affine_coef, xform_count_post_symmetry, has_density_estimator)
+    plus v0.5 malformation flags (has_nan_camera, has_nan_in_xforms),
+    always-present symmetry_kind (int | null), and has_xaos (renamed
+    from has_chaos to match community naming).
   - `INDEX.md` — aggregations + recipe table for agentic scanning.
 
 Per-flame `kind`: `genome` (single-flame, fully indexed) · `animation`
@@ -28,7 +31,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-INDEX_SCHEMA_VERSION = 4
+INDEX_SCHEMA_VERSION = 5
 
 # Pyr3 AutoRoute GPU-safety: variations whose f32 denominator cancels at
 # ±π/2 (or n*π/2) — tan/sec/csc/cot family + hyperbolic siblings.
@@ -65,6 +68,9 @@ IDENTITY_POST = "1 0 0 1 0 0"
 
 _XML_DECL_RE = re.compile(rb"^\s*<\?xml[^?]*\?>\s*", re.DOTALL)
 _FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
+# v0.5 malformation detection: whole-word, case-insensitive `nan` token.
+# Bounded by non-alphanumerics so "banana" / "unanchored" / "nano" don't match.
+_NAN_TOKEN_RE = re.compile(r"(?i)(?<![a-z0-9])nan(?![a-z0-9])")
 
 
 def parse_flame(content: bytes, gen: int, sheep_id: int) -> dict:
@@ -136,6 +142,8 @@ def _index_genome(rec: dict, root) -> dict:
     rec["background"] = [_f(x) for x in root.get("background", "0 0 0").split()]
     rec["supersample"] = _i(root.get("supersample", "1"))
     rec["highlight_power"] = _f(root.get("highlight_power", "-1"))
+    # v0.5 malformation flag: NaN in camera (root center/scale attrs).
+    rec["has_nan_camera"] = _any_attr_has_nan(root, ("center", "scale"))
 
     # Pyr3 AutoRoute: density-estimator tone-map gate. Flam3
     # `estimator_radius` defaults to 9 historically but is only ACTIVE
@@ -145,10 +153,12 @@ def _index_genome(rec: dict, root) -> dict:
 
     sym = root.find("symmetry")
     rec["has_symmetry"] = sym is not None
-    symmetry_kind = 0
+    symmetry_kind = 0  # internal var for _post_symmetry_xform_count
     if sym is not None:
         symmetry_kind = _i(sym.get("kind", "0"))
         rec["symmetry_kind"] = symmetry_kind
+    else:
+        rec["symmetry_kind"] = None
 
     xforms = root.findall("xform")
     final = root.find("finalxform")
@@ -157,7 +167,7 @@ def _index_genome(rec: dict, root) -> dict:
 
     variations: set[str] = set()
     has_post_affine = False
-    has_chaos = False
+    has_xaos = False
     negative_weight_xforms = 0
     xform_var_counts: list[int] = []
     has_post_affine_per_xform: list[bool] = []
@@ -178,7 +188,7 @@ def _index_genome(rec: dict, root) -> dict:
                 max_abs_affine_coef, _max_abs_affine(coefs)
             )
         if xf.get("chaos") is not None:
-            has_chaos = True
+            has_xaos = True
         weight = _f(xf.get("weight", "1"))
         if weight > max_xform_weight:
             max_xform_weight = weight
@@ -197,7 +207,7 @@ def _index_genome(rec: dict, root) -> dict:
         if post and post.strip() != IDENTITY_POST:
             has_post_affine = True
         if final.get("chaos") is not None:
-            has_chaos = True
+            has_xaos = True
         weight = _f(final.get("weight", "1"))
         if weight < 0:
             negative_weight_xforms += 1
@@ -222,7 +232,11 @@ def _index_genome(rec: dict, root) -> dict:
             )
 
     rec["has_post_affine"] = has_post_affine
-    rec["has_chaos"] = has_chaos
+    rec["has_xaos"] = has_xaos
+    # v0.5 malformation flag: NaN anywhere in xform / finalxform attrs.
+    rec["has_nan_in_xforms"] = any(_any_attr_has_nan(xf) for xf in xforms) or (
+        final is not None and _any_attr_has_nan(final)
+    )
     rec["negative_weight_xforms"] = negative_weight_xforms
     rec["variations"] = sorted(variations)
     rec["xform_var_counts"] = xform_var_counts
@@ -244,6 +258,20 @@ def _index_genome(rec: dict, root) -> dict:
         rec["xform_count"], symmetry_kind
     )
     return rec
+
+
+def _any_attr_has_nan(elem, attr_names=None) -> bool:
+    """True if any of elem's attribute values contains a NaN token.
+
+    If attr_names is given, scan only those attributes; else scan all
+    of elem.attrib. The token match is case-insensitive whole-word
+    (no false-positives on "banana", "nano", "unanchored").
+    """
+    if attr_names is None:
+        values = elem.attrib.values()
+    else:
+        values = (elem.get(n, "") for n in attr_names)
+    return any(_NAN_TOKEN_RE.search(v) for v in values if v)
 
 
 def _max_abs_affine(coefs_str: str) -> float:
@@ -339,17 +367,21 @@ def build_index(
 ) -> dict:
     """Walk the corpus, parse each flam3, emit ``index.json`` + ``INDEX.md``.
 
-    v0.4 ``index.json`` envelope::
+    v0.5 ``index.json`` envelope::
 
         {
-          "_schema_version": 4,
+          "_schema_version": 5,
           "_build_date": "YYYY-MM-DD",
           "genomes": [<record>, ...]
         }
 
     Per-record fields include the 5 pyr3 AutoRoute GPU-safety fields
     (``has_hyper_trig``, ``has_edisc``, ``max_abs_affine_coef``,
-    ``xform_count_post_symmetry``, ``has_density_estimator``).
+    ``xform_count_post_symmetry``, ``has_density_estimator``) plus the
+    v0.5 additions: ``has_nan_camera`` / ``has_nan_in_xforms``
+    (parser-detectable structural malformations), always-present
+    ``symmetry_kind`` (``int | null``), and ``has_xaos`` (renamed
+    from ``has_chaos`` in v0.5).
 
     Returns a summary dict (total / genomes / animations / corrupt /
     variations distinct count) — useful for callers / tests / CLI.
@@ -469,7 +501,7 @@ def _render_markdown(records: list[dict]) -> str:
         "has_post_affine": sum(1 for r in genomes if r["has_post_affine"]),
         "has_final_xform": sum(1 for r in genomes if r["has_final_xform"]),
         "has_symmetry": sum(1 for r in genomes if r["has_symmetry"]),
-        "has_chaos (xaos)": sum(1 for r in genomes if r["has_chaos"]),
+        "has_xaos": sum(1 for r in genomes if r["has_xaos"]),
         "has_nick (human-designed)": sum(1 for r in genomes if r["nick"]),
         "palette_mode_linear": sum(1 for r in genomes if r["palette_mode"] == "linear"),
         "palette_mode_step": sum(1 for r in genomes if r["palette_mode"] == "step"),
@@ -508,7 +540,7 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("| Feature | Count | Notes |")
     L.append("|---------|------:|-------|")
     notes = {
-        "has_chaos (xaos)": "pyr3 doesn't model xaos; uniform-picks instead",
+        "has_xaos": "pyr3 doesn't model xaos; uniform-picks instead",
         "supersample_gt_1": "pyr3 needs supersample=1 override for parity",
         "highlight_power_set": "pyr3 NotImplementedError on HSV-desat branch",
     }
@@ -516,7 +548,35 @@ def _render_markdown(records: list[dict]) -> str:
         L.append(f"| `{k}` | {v:,} | {notes.get(k, '')} |")
     L.append("")
 
-    L.append("## 🛡️ Pyr3 AutoRoute GPU-safety fields (v0.4)")
+    # Corpus malformations (v0.5)
+    L.append("## 🧨 Corpus malformations (v0.5)")
+    L.append("")
+    L.append(
+        "Parser-detectable structural malformations. Genomes with "
+        "`has_nan_camera` or `has_nan_in_xforms` carry textually-invalid "
+        "`nan` values inside their `<flame>` / `<xform>` attributes and "
+        "render as fully-black in every flam3-lineage renderer. Filter "
+        "out at pick time: "
+        "`select((.has_nan_camera | not) and (.has_nan_in_xforms | not))`."
+    )
+    L.append("")
+    L.append("| Gen | has_nan_camera | has_nan_in_xforms |")
+    L.append("|-----|---------------:|------------------:|")
+    nan_cam_total = 0
+    nan_xf_total = 0
+    for gen in gens:
+        gen_genomes = [r for r in genomes if r["gen"] == gen]
+        cam = sum(1 for r in gen_genomes if r.get("has_nan_camera"))
+        xf = sum(1 for r in gen_genomes if r.get("has_nan_in_xforms"))
+        nan_cam_total += cam
+        nan_xf_total += xf
+        L.append(f"| {gen} | {cam:,} | {xf:,} |")
+    L.append(
+        f"| **total** | **{nan_cam_total:,}** | **{nan_xf_total:,}** |"
+    )
+    L.append("")
+
+    L.append("## 🛡️ Pyr3 AutoRoute GPU-safety fields (v0.4+)")
     L.append("")
     L.append(
         "Static analysis driving pyr3's `AutoRoute.verdict()` CPU-vs-GPU "
@@ -608,10 +668,13 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("## 🛠️ Query recipes")
     L.append("")
     L.append(
-        "**v0.4 schema note:** `index.json` is an envelope "
+        "**v0.5 schema note:** `index.json` is an envelope "
         "`{_schema_version, _build_date, genomes: [...]}`. Recipes use "
         "`.genomes[]` as the iterator. **Default filter:** "
-        "`kind == \"genome\"` — exclude animations + corrupt."
+        "`kind == \"genome\"` — exclude animations + corrupt. "
+        "Schema bumped to **v5** (2026-05-23): adds `has_nan_camera` / "
+        "`has_nan_in_xforms`, makes `symmetry_kind` always-present "
+        "(`int | null`), renames `has_chaos` → `has_xaos`."
     )
     L.append("")
     L.append("Check schema version + build date:")
@@ -624,19 +687,24 @@ def _render_markdown(records: list[dict]) -> str:
     L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id\' index.json | head')
     L.append("```")
     L.append("")
-    L.append("Find pyr3-GPU-safe genomes (no NaN-prone vars, modest affine coefs, low xform count, no density estimator):")
+    L.append("Find pyr3-GPU-safe genomes (no NaN-prone vars, modest affine coefs, low xform count, no density estimator, no NaN malformations):")
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_hyper_trig | not) and (.has_edisc | not) and .max_abs_affine_coef <= 5 and .xform_count_post_symmetry <= 64 and (.has_density_estimator | not)) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_hyper_trig | not) and (.has_edisc | not) and .max_abs_affine_coef <= 5 and .xform_count_post_symmetry <= 64 and (.has_density_estimator | not) and (.has_nan_camera | not) and (.has_nan_in_xforms | not)) | .id\' index.json | head')
     L.append("```")
     L.append("")
-    L.append("Find pyr3-parity-friendly genomes (no chaos, supersample=1, default highlight_power, has finalxform):")
+    L.append("Find pyr3-parity-friendly genomes (no xaos, supersample=1, default highlight_power, has finalxform):")
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_chaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_xaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')
+    L.append("```")
+    L.append("")
+    L.append("Stratify genomes by symmetry kind (`null` = no `<symmetry>` element):")
+    L.append("```")
+    L.append("jq '[.genomes[] | select(.kind == \"genome\") | .symmetry_kind] | group_by(.) | map({kind: .[0], count: length})' index.json")
     L.append("```")
     L.append("")
     L.append("Find low-complexity baseline genomes:")
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_chaos | not)) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_xaos | not)) | .id\' index.json | head')
     L.append("```")
     L.append("")
     L.append("Inspect one flame in full:")
