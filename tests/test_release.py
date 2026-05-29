@@ -390,3 +390,136 @@ class TestCLISmoke:
             ],
         )
         assert result.exit_code != 0
+
+
+class TestBuildReleaseChunkArtifact:
+    """release-build emits corpus-chunks-{date}.tar alongside other artifacts."""
+
+    def test_full_build_emits_chunks_tar(self, tmp_path: Path):
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 165, [0, 1, 2], [3])
+        _populate_chunked_gen(corpus, 248, [10, 20], [11])
+        (corpus / "ATTRIBUTION.md").write_text("# Attribution\n")
+
+        written = build_release(corpus, out, build_date=BUILD_DATE)
+        names = {p.name for p in written}
+
+        assert "corpus-chunks-2026-05-23.tar" in names
+        assert (out / "corpus-chunks-2026-05-23.tar").exists()
+
+    def test_chunks_tar_is_valid_tar_with_gens_json(self, tmp_path: Path):
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 248, [10, 20], [])
+        (corpus / "ATTRIBUTION.md").write_text("# Attribution\n")
+
+        build_release(corpus, out, build_date=BUILD_DATE)
+        chunks_tar = out / "corpus-chunks-2026-05-23.tar"
+        with tarfile.open(chunks_tar, "r") as tf:
+            names = set(tf.getnames())
+        assert "gens.json" in names
+
+    def test_chunks_tar_not_written_for_single_gen(self, tmp_path: Path):
+        """only_gen mode skips the chunk artifact (mirrors skip_mega behaviour)."""
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 165, [0, 1], [])
+        _populate_chunked_gen(corpus, 248, [10], [])
+
+        written = build_release(corpus, out, build_date=BUILD_DATE, only_gen=165)
+        names = {p.name for p in written}
+
+        assert "corpus-chunks-2026-05-23.tar" not in names
+        assert not (out / "corpus-chunks-2026-05-23.tar").exists()
+
+    def test_chunks_tar_never_written_into_corpus(self, tmp_path: Path):
+        """Chunk artifact must land in out_dir, NEVER inside corpus."""
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 248, [10], [])
+        (corpus / "ATTRIBUTION.md").write_text("# Attribution\n")
+
+        build_release(corpus, out, build_date=BUILD_DATE)
+
+        # No .tar files anywhere under corpus
+        tar_files = list(corpus.rglob("*.tar"))
+        assert tar_files == [], f"chunk artifact leaked into corpus: {tar_files}"
+
+
+class TestCLIChunkCommand:
+    """sheep-fold chunk subcommand — standalone chunk artifact build."""
+
+    def test_chunk_help(self):
+        from typer.testing import CliRunner
+        from electric_sheep_fold.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["chunk", "--help"])
+        assert result.exit_code == 0
+        assert "chunk" in result.output.lower()
+
+    def test_chunk_produces_tar(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from electric_sheep_fold.cli import app
+
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 248, [10, 20], [])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "chunk",
+                "--date", "2026-05-23",
+                "--corpus", str(corpus),
+                "--out", str(out),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert (out / "corpus-chunks-2026-05-23.tar").exists()
+
+    def test_chunk_tar_contains_gens_json(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from electric_sheep_fold.cli import app
+
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 248, [10], [])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "chunk",
+                "--date", "2026-05-28",
+                "--corpus", str(corpus),
+                "--out", str(out),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        chunks_tar = out / "corpus-chunks-2026-05-28.tar"
+        with tarfile.open(chunks_tar, "r") as tf:
+            names = set(tf.getnames())
+        assert "gens.json" in names
+
+    def test_chunk_rejects_malformed_date(self, tmp_path: Path):
+        from typer.testing import CliRunner
+        from electric_sheep_fold.cli import app
+
+        corpus = tmp_path / "corpus"
+        out = tmp_path / "out"
+        _populate_chunked_gen(corpus, 248, [10], [])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "chunk",
+                "--date", "28-05-2026",
+                "--corpus", str(corpus),
+                "--out", str(out),
+            ],
+        )
+        assert result.exit_code != 0

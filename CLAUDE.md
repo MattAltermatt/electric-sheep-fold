@@ -5,9 +5,10 @@
 ```sh
 uv pip install -e ".[dev]"         # editable install + pytest
 pytest -q                          # full test suite (~207 tests, no real network)
-sheep-fold --help                  # CLI: fetch · fetch-all · import · status · index · release-build · migrate-chunked · verify-chunked · unseal · verify-unseal
+sheep-fold --help                  # CLI: fetch · fetch-all · import · status · index · release-build · migrate-chunked · verify-chunked · unseal · verify-unseal · chunk
 sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
-sheep-fold release-build --date YYYY-MM-DD   # build/release/{gen-N-DATE.zip, corpus-all-DATE.tar.xz, …}
+sheep-fold release-build --date YYYY-MM-DD   # build/release/{gen-N-DATE.zip, corpus-all-DATE.tar.xz, corpus-chunks-DATE.tar, …}
+sheep-fold chunk [--date YYYY-MM-DD]         # build/release/corpus-chunks-DATE.tar (standalone; also emitted by release-build)
 ./scripts/build_release.sh         # thin wrapper around `release-build` for the next GH Release upload
 ```
 
@@ -146,11 +147,38 @@ These must NOT be violated without a deliberate spec update:
   [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (v0.3 release artifact),
   [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) (v0.4 chunked + dated + index v4),
   [`docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md`](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md) (v0.5 NaN flags + symmetry_kind always-present + has_chaos→has_xaos).
+- **Delivery-chunk artifact** (`corpus-chunks-{date}.tar`). Built on demand
+  into `build/release/` by `sheep-fold release-build` or standalone
+  `sheep-fold chunk`. This is a distinct artifact from the per-gen `.zip`
+  and `corpus-all.tar.xz`; it feeds the pyr3 renderer at
+  `pyr3.app/v1/gen/{gen}/id/{id}` (baked same-origin into the GH Pages
+  deploy). Members:
+  - `gens.json` — plain JSON browse summary: `schema`, `build_date`,
+    `chunk_size`, `gens[]` (gen / count / min_id / max_id).
+  - `{gen}/avail.flam3idx` — per-gen present-id manifest: brotli of
+    delta-varint(sorted ids). Lets the consumer enumerate sparse ids without
+    unpacking every chunk.
+  - `{gen}/{chunk_lo:05d}.flam3chunk` — one per non-empty 256-id window:
+    brotli(JSON `{"_v": 1, "<id>": "<flam3 xml>", ...}`).
+  **Load-bearing constants and contracts:**
+  - `CHUNK_SIZE = 256` is part of the `/v1` URL contract
+    (`chunk_lo = (id // 256) * 256`); changing it is a `/v1 → /v2` event.
+  - Delivery-chunk granularity (256) is **independent** of the storage
+    bucket size (10000). Two separate concerns; never conflate.
+  - The `.flam3chunk` extension is **deliberate** and opaque — prevents any
+    HTTP host from setting `Content-Encoding: br` (which would break the
+    FE's manual brotli decode via `DecompressionStream`).
+  - The `"_v"` field inside chunk JSON is the **chunk-format version**
+    (currently `1`), independent of the URL `/v1` path prefix. Both may
+    evolve separately.
+  - `chunk.py` is the single source of truth for chunk math (`CHUNK_SIZE`,
+    `chunk_lo()`, etc.).
+  Spec: [`docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md`](docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md).
 
 ## Where things live
 
 - `src/electric_sheep_fold/` — `layout`, `manifest`, `extract`, `fetch`,
-  `importer`, `migration`, `index`, `release`, `unseal`, `cli`
+  `importer`, `migration`, `index`, `release`, `chunk`, `unseal`, `cli`
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
 - `tests/` — pytest suites; pure / mock-driven, no real network (~207 tests)
 - `corpus/` — local data (gitignored, chunked layout). Auto-materialized

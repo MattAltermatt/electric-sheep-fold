@@ -1,0 +1,236 @@
+"""Tests for electric_sheep_fold.chunk — delivery-chunk math + artifact build.
+
+The delivery chunk (256 consecutive ids) is intentionally INDEPENDENT of the
+storage bucket (10000) in layout.py — different concern (transfer vs archive).
+See docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md.
+"""
+import json
+
+import brotli
+
+from electric_sheep_fold.chunk import (
+    CHUNK_FORMAT_VERSION,
+    CHUNK_SIZE,
+    build_chunk_bytes,
+    build_gens_json,
+    chunk_filename,
+    chunk_lo,
+    decode_avail,
+    encode_avail,
+)
+
+
+def test_chunk_size_is_256():
+    assert CHUNK_SIZE == 256
+
+
+def test_chunk_lo_floors_to_multiple_of_256():
+    assert chunk_lo(0) == 0
+    assert chunk_lo(255) == 0
+    assert chunk_lo(256) == 256
+    assert chunk_lo(12345) == 12288
+
+
+def test_chunk_filename_is_zero_padded_opaque():
+    # Opaque extension on purpose (no .br) — prevents any host from setting
+    # Content-Encoding: br and breaking the FE's manual brotli decode.
+    assert chunk_filename(247, 12345) == "247/12288.flam3chunk"
+    assert chunk_filename(247, 5) == "247/00000.flam3chunk"
+
+
+def test_build_chunk_roundtrips():
+    flames = {
+        12288: "<flame name='a'>x</flame>",
+        12290: "<flame name='b'>y</flame>",
+    }
+    raw = build_chunk_bytes(flames)
+    obj = json.loads(brotli.decompress(raw))
+    assert obj["_v"] == CHUNK_FORMAT_VERSION == 1
+    assert obj["12288"] == "<flame name='a'>x</flame>"
+    assert obj["12290"] == "<flame name='b'>y</flame>"
+    assert "12289" not in obj  # gaps are simply absent
+
+
+def test_build_chunk_preserves_non_ascii_xml():
+    # ensure_ascii=False keeps bytes faithful; brotli handles the UTF-8.
+    flames = {1: "<flame name='café ☕'>—</flame>"}
+    obj = json.loads(brotli.decompress(build_chunk_bytes(flames)))
+    assert obj["1"] == "<flame name='café ☕'>—</flame>"
+
+
+# ---------------------------------------------------------------------------
+# encode_avail / decode_avail — per-gen present-id availability manifest
+# ---------------------------------------------------------------------------
+
+
+def test_avail_roundtrips_sparse_clustered_ids():
+    ids = sorted({0, 1, 2, 3, 100, 101, 40000, 41234})
+    raw = encode_avail(ids)
+    assert decode_avail(raw) == ids
+    assert len(raw) < len(ids) * 4  # compact
+
+
+def test_avail_empty_list():
+    raw = encode_avail([])
+    assert raw == brotli.compress(b"", quality=11)
+    assert decode_avail(raw) == []
+
+
+def test_avail_single_id():
+    assert decode_avail(encode_avail([42])) == [42]
+    assert decode_avail(encode_avail([0])) == [0]
+
+
+def test_avail_large_clustered_range():
+    ids = list(range(0, 5000)) + [40000, 41234]
+    raw = encode_avail(ids)
+    assert decode_avail(raw) == ids
+    # sanity: brotli + delta should compress densely-packed ids well
+    assert len(raw) < len(ids) * 2
+
+
+def test_avail_deduplicates_and_sorts_input():
+    # defensive: unsorted + dupes still round-trip to a sorted unique list
+    ids_messy = [3, 1, 2, 1, 3, 100]
+    expected = [1, 2, 3, 100]
+    assert decode_avail(encode_avail(ids_messy)) == expected
+
+
+# ---------------------------------------------------------------------------
+# build_gens_json — browse summary for gens.json
+# ---------------------------------------------------------------------------
+
+
+def test_gens_json_shape():
+    out = build_gens_json({247: [0, 5, 41234], 248: [10]}, build_date="2026-05-28")
+    assert out["schema"] == 1 and out["chunk_size"] == 256
+    assert out["build_date"] == "2026-05-28"
+    assert out["gens"][0] == {"gen": 247, "count": 3, "min_id": 0, "max_id": 41234}
+    assert out["gens"][1]["gen"] == 248
+
+
+def test_gens_json_empty_input():
+    out = build_gens_json({}, "2026-05-28")
+    assert out["gens"] == []
+
+
+def test_gens_json_sorted_ascending():
+    # Output gens must be sorted ascending regardless of dict insertion order.
+    out = build_gens_json({248: [100], 247: [50], 165: [1]}, "2026-05-28")
+    assert [g["gen"] for g in out["gens"]] == [165, 247, 248]
+
+
+def test_gens_json_single_id_min_max_equal():
+    out = build_gens_json({247: [99]}, "2026-05-28")
+    entry = out["gens"][0]
+    assert entry["count"] == 1
+    assert entry["min_id"] == entry["max_id"] == 99
+
+
+# ---------------------------------------------------------------------------
+# build_chunks_tar — corpus-chunks-{date}.tar artifact assembly
+# ---------------------------------------------------------------------------
+
+import tarfile
+from electric_sheep_fold.chunk import build_chunks_tar
+
+
+def _write_flam3(corpus: "Path", gen: int, sid: int, body: str):
+    f = corpus / str(gen) / f"{(sid // 10000) * 10000:05d}" / f"electricsheep.{gen}.{sid}.flam3"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(body)
+    return f
+
+
+def test_build_chunks_tar(tmp_path):
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, "<flame>five</flame>")
+    _write_flam3(corpus, 247, 300, "<flame>threehundred</flame>")  # different 256-window
+    out = tmp_path / "corpus-chunks-2026-05-28.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    names = set(tarfile.open(out).getnames())
+    assert "gens.json" in names
+    assert "247/avail.flam3idx" in names
+    assert "247/00000.flam3chunk" in names   # id 5 -> window 0
+    assert "247/00256.flam3chunk" in names   # id 300 -> window 256
+    with tarfile.open(out) as t:
+        obj = json.loads(brotli.decompress(t.extractfile("247/00000.flam3chunk").read()))
+        assert obj["5"] == "<flame>five</flame>"
+
+
+def test_build_chunks_tar_gens_json_plain(tmp_path):
+    """gens.json is plain JSON, NOT brotli-compressed."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, "<flame>five</flame>")
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    with tarfile.open(out) as t:
+        raw = t.extractfile("gens.json").read()
+        obj = json.loads(raw)  # plain JSON — no brotli
+    assert obj["schema"] == 1
+    assert obj["build_date"] == "2026-05-28"
+    assert obj["chunk_size"] == 256
+    assert len(obj["gens"]) == 1
+    assert obj["gens"][0]["gen"] == 247
+    assert obj["gens"][0]["count"] == 1
+
+
+def test_build_chunks_tar_avail_decodes(tmp_path):
+    """247/avail.flam3idx decodes via decode_avail to the full sorted id list."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, "<flame>a</flame>")
+    _write_flam3(corpus, 247, 300, "<flame>b</flame>")
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    with tarfile.open(out) as t:
+        raw = t.extractfile("247/avail.flam3idx").read()
+    assert decode_avail(raw) == [5, 300]
+
+
+def test_build_chunks_tar_multiple_gens(tmp_path):
+    """Multiple gens each get their own dir with avail + chunk members."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 10, "<flame>a</flame>")
+    _write_flam3(corpus, 248, 20, "<flame>b</flame>")
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    names = set(tarfile.open(out).getnames())
+    assert "247/avail.flam3idx" in names
+    assert "248/avail.flam3idx" in names
+    assert "247/00000.flam3chunk" in names
+    assert "248/00000.flam3chunk" in names
+    with tarfile.open(out) as t:
+        obj_247 = json.loads(brotli.decompress(t.extractfile("247/00000.flam3chunk").read()))
+        obj_248 = json.loads(brotli.decompress(t.extractfile("248/00000.flam3chunk").read()))
+    assert obj_247["10"] == "<flame>a</flame>"
+    assert obj_248["20"] == "<flame>b</flame>"
+
+
+def test_build_chunks_tar_two_ids_same_window(tmp_path):
+    """Two ids in the same 256-window land in ONE chunk containing both."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 100, "<flame>x</flame>")
+    _write_flam3(corpus, 247, 200, "<flame>y</flame>")  # both in window 0
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    names = set(tarfile.open(out).getnames())
+    # Only one chunk file — no 247/00256.flam3chunk
+    chunk_names = [n for n in names if n.endswith(".flam3chunk")]
+    assert chunk_names == ["247/00000.flam3chunk"]
+    with tarfile.open(out) as t:
+        obj = json.loads(brotli.decompress(t.extractfile("247/00000.flam3chunk").read()))
+    assert obj["100"] == "<flame>x</flame>"
+    assert obj["200"] == "<flame>y</flame>"
+
+
+def test_build_chunks_tar_is_reproducible_mtime_zero(tmp_path):
+    """All tar members carry mtime=0 — load-bearing for a reproducible
+    artifact (no wall-clock leakage across rebuilds)."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, "<flame>five</flame>")
+    _write_flam3(corpus, 247, 300, "<flame>three</flame>")
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")
+    with tarfile.open(out) as t:
+        for member in t.getmembers():
+            assert member.mtime == 0, f"{member.name} has non-zero mtime"

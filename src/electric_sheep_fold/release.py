@@ -35,6 +35,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from electric_sheep_fold.chunk import build_chunks_tar
 from electric_sheep_fold.extract import MANIFEST_COLUMNS, extract_metadata
 from electric_sheep_fold.index import build_index
 from electric_sheep_fold.layout import (
@@ -153,6 +154,10 @@ def _gen_zip_filename(gen: int, build_date: date) -> str:
 
 def _mega_tarxz_filename(build_date: date) -> str:
     return f"corpus-all-{build_date.isoformat()}.tar.xz"
+
+
+def _chunks_tar_filename(build_date: date) -> str:
+    return f"corpus-chunks-{build_date.isoformat()}.tar"
 
 
 def build_gen_zip(
@@ -297,6 +302,7 @@ def build_release(
     only_gen: int | None = None,
     regen_index: bool = True,
     skip_mega: bool = False,
+    skip_chunks: bool = False,
 ) -> list[Path]:
     """Build the full v0.4 release artifact set into ``out_dir``.
 
@@ -309,10 +315,12 @@ def build_release(
          ``corpus/`` to ``out_dir/``.
       4. Build ``corpus-all-{date}.tar.xz`` mega-bundle (unless
          ``skip_mega=True``).
+      5. Build ``corpus-chunks-{date}.tar`` delivery-chunk artifact (unless
+         ``skip_chunks=True``).
 
-    ``only_gen`` mode skips steps 1, 3, and 4 — used by ``--gen N`` for
-    fast per-gen rebuilds. ``skip_mega`` is a test-only escape hatch
-    to avoid LZMA cost on small fixtures.
+    ``only_gen`` mode skips steps 1, 3, 4, and 5 — used by ``--gen N`` for
+    fast per-gen rebuilds. ``skip_mega`` / ``skip_chunks`` are test-only
+    escape hatches to avoid compression cost on small fixtures.
 
     Returns the list of paths written (in order).
     """
@@ -366,4 +374,11 @@ def build_release(
         written.append(_build_mega_tarxz(
             corpus_root, out_dir, build_date, fetched_at=fetched_at,
         ))
+
+    if not skip_chunks:
+        chunks_dest = out_dir / _chunks_tar_filename(build_date)
+        build_chunks_tar(corpus_root, chunks_dest, build_date.isoformat())
+        log.info("built %s", chunks_dest.name)
+        written.append(chunks_dest)
+
     return written

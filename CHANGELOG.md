@@ -8,6 +8,44 @@
 
 ## Pending — next dated release
 
+### Phase 12f — delivery-chunk artifact + `sheep-fold chunk` CLI
+
+New `corpus-chunks-{date}.tar` Release asset and standalone
+`sheep-fold chunk [--date YYYY-MM-DD]` CLI command (also emitted
+automatically by `sheep-fold release-build`). This artifact feeds
+[pyr3](https://github.com/MattAltermatt/pyr3) at
+`pyr3.app/v1/gen/{gen}/id/{id}` — baked same-origin into the GH Pages
+deploy, no CORS, no third-party CDN.
+
+**Tar members:**
+
+- `gens.json` — plain JSON browse summary: `schema`, `build_date`,
+  `chunk_size` (256), `gens[]` (gen / count / min_id / max_id).
+- `{gen}/avail.flam3idx` — per-gen present-id manifest: brotli of
+  delta-varint(sorted ids). Consumer can enumerate sparse ids without
+  unpacking every chunk.
+- `{gen}/{chunk_lo:05d}.flam3chunk` — one per non-empty 256-id window:
+  brotli(JSON `{"_v": 1, "<id>": "<flam3 xml>", ...}`). ~172 KB each;
+  whole corpus ≈ 110 MB brotli'd.
+
+**Load-bearing invariants introduced:**
+
+- `CHUNK_SIZE = 256` is part of the `/v1` URL contract; changing it is a
+  `/v1 → /v2` event. Delivery-chunk granularity (256) is **independent**
+  of the storage bucket size (10000).
+- `.flam3chunk` extension is opaque by design — prevents `Content-Encoding: br`
+  auto-set, which would break the FE's manual brotli decode.
+- `"_v"` inside chunk JSON is the chunk-format version (`1`), independent
+  of the URL `/v1` prefix.
+- `chunk.py` is the single source of truth for all chunk math
+  (`CHUNK_SIZE`, `chunk_lo()`, etc.).
+
+**Code shape:** new `chunk.py` module (~200 LOC); `release.py` wires
+`sheep-fold chunk` CLI + calls `build_chunks_tar()` from
+`release-build`. 242/242 tests green.
+
+Spec: [`docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md`](docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md).
+
 ### Phase 12e — index schema v5: malformation flags + xaos rename
 
 Inbound design proposal from pyr3 (sibling repo) flagged ~153 of 149,904

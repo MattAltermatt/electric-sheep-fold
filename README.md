@@ -45,6 +45,22 @@ Each per-gen zip contains:
 - `{bucket}/electricsheep.{gen}.{id}.flam3` — chunked by `(id // 10000) * 10000`
   so big gens stay browsable in Finder / `ls`.
 
+A third Release asset, **`corpus-chunks-{date}.tar`**, is the
+renderer-facing delivery layer consumed by
+[pyr3](https://github.com/MattAltermatt/pyr3) at
+`pyr3.app/v1/gen/{gen}/id/{id}` (baked same-origin into its GitHub Pages
+deploy). Members:
+
+- `gens.json` — JSON browse summary (schema, build_date, chunk_size,
+  gens[] with gen/count/min_id/max_id).
+- `{gen}/avail.flam3idx` — per-gen present-id manifest: brotli of
+  delta-varint(sorted ids); tells the renderer which sparse ids exist.
+- `{gen}/{chunk_lo:05d}.flam3chunk` — one per non-empty 256-id window:
+  brotli'd JSON `{"_v": 1, "<id>": "<flam3 xml>", ...}`. ~172 KB each;
+  whole corpus ≈ 110 MB brotli'd. The `.flam3chunk` extension is opaque
+  by design — prevents HTTP hosts from auto-setting `Content-Encoding: br`
+  (which would break the renderer's manual brotli decode).
+
 `index.json` is `jq`-queryable (v0.4 envelope:
 `{_schema_version: 4, _build_date, genomes: [...]}` — use `.genomes[]` as
 the iterator). `INDEX.md` is human + agent-readable. See
@@ -94,7 +110,8 @@ sheep-fold --help
 | `sheep-fold import DIR` | Import existing local `.flam3`s into `corpus/{gen}/{bucket}/` |
 | `sheep-fold index` | Rebuild `corpus/_index/{index.json, INDEX.md}` (agent-queryable) |
 | `sheep-fold status` | Show per-gen file + missing counts |
-| `sheep-fold release-build [--date YYYY-MM-DD]` | Build `build/release/gen-{N}-{date}.zip` + `corpus-all-{date}.tar.xz` from corpus state |
+| `sheep-fold release-build [--date YYYY-MM-DD]` | Build `build/release/gen-{N}-{date}.zip` + `corpus-all-{date}.tar.xz` + `corpus-chunks-{date}.tar` from corpus state |
+| `sheep-fold chunk [--date YYYY-MM-DD]` | Build `build/release/corpus-chunks-{date}.tar` standalone (also emitted by `release-build`) |
 | `sheep-fold migrate-chunked` / `verify-chunked` | v0.4 chunked-layout migration (idempotent) + consistency guard |
 | `sheep-fold unseal` / `verify-unseal` | Historical v0.2 → v0.3 sealed-zip unwind (one-shot; preserved for archival re-runs) |
 | `./scripts/build_release.sh` | Thin wrapper around `sheep-fold release-build` for the next GH Release |
@@ -126,7 +143,9 @@ gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).
   [v0.2 chunked-zip](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) ·
   [v0.2.1 dead-gen whole-zip](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md) ·
   [v0.3 loose corpus](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) ·
-  [v0.4 chunked + dated + AutoRoute index](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md)
+  [v0.4 chunked + dated + AutoRoute index](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) ·
+  [v0.5 NaN flags + xaos rename](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md) ·
+  [share URL + chunk delivery](docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md)
 
 ## License
 

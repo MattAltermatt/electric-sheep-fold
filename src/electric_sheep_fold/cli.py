@@ -7,6 +7,7 @@ from pathlib import Path
 
 import typer
 
+from electric_sheep_fold.chunk import build_chunks_tar
 from electric_sheep_fold.fetch import fetch_all, fetch_range, make_client
 from electric_sheep_fold.importer import import_dir
 from electric_sheep_fold.index import build_index
@@ -362,6 +363,47 @@ def verify_chunked_cmd(
     for gen, reason in divergences:
         typer.echo(f"  gen {gen}: {reason}")
     raise typer.Exit(code=1)
+
+
+@app.command()
+def chunk(
+    corpus: Path = typer.Option(Path("./corpus")),
+    out: Path = typer.Option(
+        Path("./build/release"),
+        "--out",
+        help="Directory to write corpus-chunks-DATE.tar into.",
+    ),
+    date_str: str | None = typer.Option(
+        None,
+        "--date",
+        help="Build date stamped into artifact filename (YYYY-MM-DD). Defaults to today UTC.",
+    ),
+) -> None:
+    """Build corpus-chunks-{date}.tar delivery artifact (standalone/debug).
+
+    Walks the v0.4 chunked corpus; emits brotli'd 256-id delivery windows
+    + per-gen availability manifests + gens.json browse summary.
+    Use ``release-build`` to include this artifact in a full release.
+    """
+    from datetime import date as _date, datetime as _dt, timezone as _tz
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if not corpus.exists():
+        raise typer.BadParameter(f"corpus dir not found: {corpus}")
+
+    build_date: _date
+    if date_str is not None:
+        try:
+            build_date = _dt.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError as e:
+            raise typer.BadParameter(f"--date must be YYYY-MM-DD: {e}") from e
+    else:
+        build_date = _dt.now(tz=_tz.utc).date()
+
+    out.mkdir(parents=True, exist_ok=True)
+    dest = out / f"corpus-chunks-{build_date.isoformat()}.tar"
+    build_chunks_tar(corpus, dest, build_date.isoformat())
+    typer.echo(f"\nwrote {dest}")
 
 
 @app.command()
