@@ -223,6 +223,25 @@ def test_build_chunks_tar_two_ids_same_window(tmp_path):
     assert obj["200"] == "<flame>y</flame>"
 
 
+def test_build_chunks_tar_skips_non_utf8_file(tmp_path):
+    """ESF-021: a single non-UTF-8 .flam3 must not abort the whole build. It is
+    skipped — absent from BOTH avail and the chunk (so they stay consistent) —
+    while the rest of the corpus still ships."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, "<flame>ok</flame>")
+    bad = corpus / "247" / "00000" / "electricsheep.247.6.flam3"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_bytes(b"\xff\xfe<flame>\x80\x81</flame>")  # invalid UTF-8
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-28")  # must NOT raise
+    with tarfile.open(out) as t:
+        avail = decode_avail(t.extractfile("247/avail.flam3idx").read())
+        obj = json.loads(brotli.decompress(t.extractfile("247/00000.flam3chunk").read()))
+    assert avail == [5]          # bad id 6 excluded from avail
+    assert obj["5"] == "<flame>ok</flame>"
+    assert "6" not in obj        # … and from the chunk
+
+
 def test_build_chunks_tar_is_reproducible_mtime_zero(tmp_path):
     """All tar members carry mtime=0 — load-bearing for a reproducible
     artifact (no wall-clock leakage across rebuilds)."""

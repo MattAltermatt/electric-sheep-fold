@@ -208,7 +208,19 @@ def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
             sid = int(parts[2])
         except ValueError:
             continue
-        per_gen[gen][sid] = path.read_text(encoding="utf-8")
+        try:
+            per_gen[gen][sid] = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            # A corrupt, non-UTF-8 .flam3 (flam3 XML is always UTF-8). Skip it
+            # rather than abort the whole artifact — and skip it entirely so it
+            # stays out of BOTH avail and the chunk (they must agree). Better an
+            # absent id than mojibake the renderer can't parse.
+            log.warning(
+                "build_chunks_tar: %s is not valid UTF-8 — skipping "
+                "(excluded from avail + chunk)",
+                path,
+            )
+            continue
 
     if not per_gen:
         # Most likely a pre-v0.4 flat corpus (files at {gen}/...flam3, one
