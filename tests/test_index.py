@@ -191,6 +191,19 @@ class TestPerXformVariationCounts:
         assert rec["kind"] == "corrupt"
         assert rec["valid"] is False
 
+    def test_entity_bomb_is_corrupt_not_expanded(self):
+        # ESF-026: an internal-entity (billion-laughs class) payload must be
+        # rejected by the defused parser and classified corrupt — NEVER
+        # expanded (stdlib ElementTree would expand it, risking a DoS).
+        bomb = (
+            b'<?xml version="1.0"?>'
+            b'<!DOCTYPE flame [<!ENTITY a "AAAA">]>'
+            b'<flame name="&a;"><xform weight="1" linear="1"/></flame>'
+        )
+        rec = parse_flame(bomb, 247, 1)
+        assert rec["kind"] == "corrupt"
+        assert rec["valid"] is False
+
     def test_get_envelope_treated_as_genome(self):
         # Archive's <get>-wrapped envelope; inner flame is the canonical genome.
         # Test data deliberately omits the leading <?xml?> decl since it would

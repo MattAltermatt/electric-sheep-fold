@@ -5,7 +5,9 @@ import hashlib
 import logging
 import re
 from datetime import datetime
-from xml.etree import ElementTree as ET
+
+import defusedxml.ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +56,9 @@ def is_flam3_content(content: bytes) -> bool:
         return False
     try:
         wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
-    except ET.ParseError:
+    except (ET.ParseError, DefusedXmlException):
+        # Malformed XML, or a defused payload (entity/DTD/external bomb) — not
+        # a flame either way (ESF-026).
         return False
     return wrapper.find(".//flame") is not None
 
@@ -95,7 +99,7 @@ def extract_metadata(
     stripped = _XML_DECL_RE.sub(b"", content)
     try:
         wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
-    except ET.ParseError as e:
+    except (ET.ParseError, DefusedXmlException) as e:
         log.warning("flam3 %d XML parse failed: %s", sheep_id, e)
         return row
 

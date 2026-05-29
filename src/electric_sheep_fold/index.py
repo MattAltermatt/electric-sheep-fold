@@ -29,7 +29,9 @@ import zipfile
 from collections import Counter
 from datetime import date, datetime, timezone
 from pathlib import Path
-from xml.etree import ElementTree as ET
+
+import defusedxml.ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 
@@ -97,7 +99,7 @@ def parse_flame(content: bytes, gen: int, sheep_id: int) -> dict:
 
     try:
         root = ET.fromstring(stripped)
-    except ET.ParseError as exc:
+    except (ET.ParseError, DefusedXmlException) as exc:
         msg = str(exc)
         if "junk after document element" in msg:
             # The parser read a valid first root element, then hit more bytes.
@@ -111,7 +113,7 @@ def parse_flame(content: bytes, gen: int, sheep_id: int) -> dict:
         # Archive sometimes wraps in <get>...</get>; try synthetic root.
         try:
             wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
-        except ET.ParseError:
+        except (ET.ParseError, DefusedXmlException):
             rec.update(kind="corrupt", valid=False, error=f"parse: {msg[:80]}")
             return rec
         flames = wrapper.findall(".//flame")
