@@ -101,6 +101,52 @@ class TestFetchRange5xx:
         assert not ms.contains(200)
 
 
+class TestFetchRange200NonFlame:
+    """ESF-018: a 200-OK whose body is not a flam3 (the archive's `none\\n`
+    placeholder, an HTML error page) must NOT be written to the corpus and must
+    NOT be recorded as missing — it is treated as a transient error."""
+
+    def test_none_sentinel_not_written(self, tmp_path: Path):
+        def handler(req):
+            return httpx.Response(200, content=b"none\n")
+        client = _build_client(handler)
+        stats = fetch_range(
+            gen=248, start=300, end=301, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.downloaded == 0
+        assert stats.files_written == 0
+        assert stats.transient_errors == 1
+        assert not flam3_path(248, 300, tmp_path).exists()
+        ms = MissingSet(tmp_path / "248" / "missing.txt")
+        ms.load()
+        assert not ms.contains(300)  # NOT a 404 — id stays probeable
+
+    def test_html_error_page_not_written(self, tmp_path: Path):
+        def handler(req):
+            return httpx.Response(200, content=b"<html><body>oops</body></html>")
+        client = _build_client(handler)
+        stats = fetch_range(
+            gen=248, start=301, end=302, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.files_written == 0
+        assert stats.transient_errors == 1
+        assert not flam3_path(248, 301, tmp_path).exists()
+
+    def test_valid_flame_still_written(self, tmp_path: Path):
+        # Guard: the validation gate must not reject legitimate flames.
+        def handler(req):
+            return httpx.Response(200, content=FLAM3)
+        client = _build_client(handler)
+        stats = fetch_range(
+            gen=248, start=302, end=303, corpus_root=tmp_path,
+            client=client, delay=0, jitter=0,
+        )
+        assert stats.files_written == 1
+        assert flam3_path(248, 302, tmp_path).exists()
+
+
 class TestSkipLocalHit:
     def test_no_network_when_loose_file_exists(self, tmp_path: Path):
         calls = {"n": 0}

@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 
 from electric_sheep_fold import __version__
+from electric_sheep_fold.extract import is_flam3_content
 from electric_sheep_fold.layout import flam3_path, remote_url
 from electric_sheep_fold.manifest import MissingSet
 from electric_sheep_fold.migration import migrate_v0_1_if_needed
@@ -131,11 +132,21 @@ def fetch_range(
             continue
 
         status = response.status_code
-        if status == 200:
+        if status == 200 and is_flam3_content(response.content):
             _atomic_write_flam3(dest, response.content)
             log.info("downloaded %d.%05d", gen, sheep_id)
             stats.downloaded += 1
             stats.files_written += 1
+        elif status == 200:
+            # 200 OK but the body is not a flam3 (the `none\n` sentinel, an
+            # HTML error page, an empty body). NEVER write it to the corpus —
+            # a poisoned .flam3 would mark this id skip-local forever — and do
+            # NOT record it missing (it isn't a 404). Retry-able transient.
+            log.warning(
+                "200 OK with non-flam3 body for %d.%05d — treating as transient",
+                gen, sheep_id,
+            )
+            stats.transient_errors += 1
         elif status == 404:
             missing.add(sheep_id)
             missing.save_atomic()
