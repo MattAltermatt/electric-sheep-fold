@@ -449,3 +449,43 @@ class TestCLISmoke:
         )
         assert result.exit_code == 0, result.output
         assert "ok" in result.output.lower()
+
+
+class TestMoveFlam3sNoClobber:
+    """ESF-023: the step-(d) move must never overwrite an existing corpus file
+    in the gen dir — it may be a NEWER file written by a concurrent fetch
+    between unseal steps. Same id ⇒ same content (ES is append-only), so the
+    redundant extracted copy is discarded and the destination is preserved."""
+
+    def test_existing_dest_not_clobbered(self, tmp_path: Path):
+        from electric_sheep_fold.unseal import _move_flam3s_into_gen_dir
+
+        tmp = tmp_path / "tmp"
+        tmp.mkdir()
+        gen_dir = tmp_path / "248"
+        gen_dir.mkdir()
+        name = flam3_filename(248, 100)
+        (tmp / name).write_bytes(b"sealed-copy")
+        (gen_dir / name).write_bytes(b"newer-fetch")  # pre-existing corpus file
+
+        moved = _move_flam3s_into_gen_dir(tmp, gen_dir, 248)
+
+        assert moved == 1
+        assert (gen_dir / name).read_bytes() == b"newer-fetch"  # NOT clobbered
+        assert not (tmp / name).exists()  # redundant extracted copy consumed
+
+    def test_dest_absent_relocates(self, tmp_path: Path):
+        from electric_sheep_fold.unseal import _move_flam3s_into_gen_dir
+
+        tmp = tmp_path / "tmp"
+        tmp.mkdir()
+        gen_dir = tmp_path / "248"
+        gen_dir.mkdir()
+        name = flam3_filename(248, 100)
+        (tmp / name).write_bytes(b"content")
+
+        moved = _move_flam3s_into_gen_dir(tmp, gen_dir, 248)
+
+        assert moved == 1
+        assert (gen_dir / name).read_bytes() == b"content"
+        assert not (tmp / name).exists()

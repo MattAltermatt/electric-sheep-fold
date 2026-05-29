@@ -292,7 +292,15 @@ def _move_flam3s_into_gen_dir(tmp_dir: Path, gen_dir: Path, gen: int) -> int:
     moved = 0
     for src in sorted(tmp_dir.glob(f"electricsheep.{gen}.*.flam3")):
         dest = gen_dir / src.name
-        os.replace(src, dest)
+        if dest.exists():
+            # Never clobber an existing corpus file (ESF-023). Under ES's
+            # append-only immutability the same id always carries the same
+            # content, and dest may be a NEWER file written by a concurrent
+            # fetch between unseal steps. Discard the redundant extracted copy;
+            # the canonical dest stays put.
+            src.unlink()
+        else:
+            os.replace(src, dest)
         moved += 1
     return moved
 
