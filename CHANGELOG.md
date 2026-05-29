@@ -8,6 +8,16 @@
 
 ## Pending — next dated release
 
+### Phase 12h — supply-chain hardening (ESF-026, ESF-028)
+
+- **ESF-026 — defused XML.** Untrusted network `.flam3` is now parsed with
+  `defusedxml.ElementTree` (both `extract.py` and `index.py`); entity/DTD/
+  external bombs are rejected and classified `corrupt` instead of being
+  expanded (a build-host DoS vector) or crashing. New `defusedxml>=0.7` dep.
+- **ESF-028 — committed lockfile.** `uv.lock` (full pinned graph + sha256
+  hashes, including the new `defusedxml`) is now tracked, so installs are
+  reproducible and hash-verified instead of resolving fresh from PyPI.
+
 ### Phase 12g — code-review correctness pass (ESF-017–022)
 
 Confirmed bugs + a metadata cleanup found in a three-critic whole-codebase

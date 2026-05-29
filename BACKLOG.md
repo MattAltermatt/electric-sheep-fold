@@ -137,7 +137,15 @@ flam3 in `build_chunks_tar` (ESF-021), corrupt-vs-animation classification
 (ESF-022), or the unseal SIGKILL-resume clobber (ESF-023). Add regressions
 alongside each fix.
 
-## [ESF-026] security · S · 🔒 · open — parse untrusted XML with `defusedxml`
+## [ESF-026] security · S · 🔒 · ✅ **RESOLVED (2026-05-29, `4d8f353`)** — parse untrusted XML with `defusedxml`
+
+> **✅ Resolved 2026-05-29.** Both `ET.fromstring` callsites (`extract.py`,
+> `index.py`) now use `defusedxml.ElementTree`; `except` clauses broadened to
+> `(ET.ParseError, DefusedXmlException)` so an entity/DTD/external bomb is
+> classified `corrupt` (or non-flame), never expanded or crashing the build.
+> Added `defusedxml>=0.7` dep. Test
+> `test_index.py::…::test_entity_bomb_is_corrupt_not_expanded`.
+
 
 Network-sourced `.flam3` is parsed with stdlib `ElementTree` (`extract.py`,
 `index.py`). XXE is blocked by Python's expat defaults, but **billion-laughs
@@ -152,7 +160,13 @@ can poison the corpus (and amplifies ESF-026). Upstream is a 2010-era lighttpd
 likely without TLS, so this may be unavoidable — but it should be an explicit,
 documented trust boundary (and a standing reason to keep ESF-026 done).
 
-## [ESF-028] infra · XS · 🔧 · open — commit `uv.lock`
+## [ESF-028] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — commit `uv.lock`
+
+> **✅ Resolved 2026-05-29.** `uv.lock` (now pinning the full graph incl.
+> `defusedxml` from ESF-026, with sha256 hashes) is tracked. Reverses the
+> earlier leave-it-untracked stance — a CLI that ingests untrusted data and
+> publishes public artifacts should pin its supply chain.
+
 
 `uv.lock` pins exact versions with sha256 hashes but is **untracked**; runtime
 deps float on `>=` lower bounds, so a fresh install resolves to whatever is
