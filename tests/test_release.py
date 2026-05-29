@@ -4,17 +4,13 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-import os
 import tarfile
 import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-import pytest
-
 from electric_sheep_fold.layout import bucket_for, flam3_filename, flam3_path
 from electric_sheep_fold.release import build_gen_zip, build_release
-
 
 FLAM3_TEMPLATE = (
     b'<?xml version="1.0"?>'
@@ -316,6 +312,7 @@ class TestBuildReleaseSingleGen:
 class TestCLISmoke:
     def test_release_build_help(self):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         runner = CliRunner()
@@ -325,6 +322,7 @@ class TestCLISmoke:
 
     def test_release_build_runs_with_date(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"
@@ -348,6 +346,7 @@ class TestCLISmoke:
 
     def test_release_build_single_gen_cli(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"
@@ -373,6 +372,7 @@ class TestCLISmoke:
 
     def test_release_build_rejects_malformed_date(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"
@@ -452,6 +452,7 @@ class TestCLIChunkCommand:
 
     def test_chunk_help(self):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         runner = CliRunner()
@@ -461,6 +462,7 @@ class TestCLIChunkCommand:
 
     def test_chunk_produces_tar(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"
@@ -482,6 +484,7 @@ class TestCLIChunkCommand:
 
     def test_chunk_tar_contains_gens_json(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"
@@ -506,6 +509,7 @@ class TestCLIChunkCommand:
 
     def test_chunk_rejects_malformed_date(self, tmp_path: Path):
         from typer.testing import CliRunner
+
         from electric_sheep_fold.cli import app
 
         corpus = tmp_path / "corpus"

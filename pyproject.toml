@@ -16,6 +16,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
 ]
 
 [project.scripts]
@@ -39,3 +41,16 @@ packages = ["src/electric_sheep_fold"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+# ESF-031: lint + types, enforced in CI. Baseline ruleset (E/F/I); tighten
+# later as deliberate increments.
+[tool.ruff]
+target-version = "py311"
+line-length = 100  # matches the codebase's existing style (88 was never followed)
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

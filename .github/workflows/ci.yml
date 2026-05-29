@@ -1,10 +1,10 @@
 name: CI
 
-# ESF-030: run the test suite on every push to main and every PR.
+# ESF-030/031: lint + types + tests on every push to main and every PR.
 # Hardening per current GitHub guidance:
 #   - actions pinned to full commit SHA (tag in trailing comment)
 #   - least-privilege token (contents: read only)
-#   - matrix exercises the requires-python = ">=3.11" claim across 3.11–3.13
+#   - test matrix exercises requires-python = ">=3.11" across 3.11–3.13
 on:
   push:
     branches: [main]
@@ -18,6 +18,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked, with dev extra)
+        run: uv sync --locked --extra dev
+      - name: Ruff
+        run: uv run ruff check src tests
+      - name: Mypy
+        run: uv run mypy src/electric_sheep_fold
+
   test:
     name: pytest (py${{ matrix.python-version }})
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from electric_sheep_fold.layout import bucket_for, flam3_filename, flam3_path
+from electric_sheep_fold.layout import flam3_filename, flam3_path
 from electric_sheep_fold.manifest import MissingSet
 from electric_sheep_fold.migration import (
     CHUNKED_VERIFIED_FILENAME,

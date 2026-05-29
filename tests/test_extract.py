@@ -4,8 +4,11 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from electric_sheep_fold.extract import MANIFEST_COLUMNS, extract_metadata, is_flam3_content
-
+from electric_sheep_fold.extract import (
+    MANIFEST_COLUMNS,
+    extract_metadata,
+    is_flam3_content,
+)
 
 WELL_FORMED = b"""<?xml version="1.0"?>
 <flame name="example" nick="alice" url="http://example.com">

@@ -38,7 +38,6 @@ from typing import Callable
 from electric_sheep_fold.chunk import build_chunks_tar
 from electric_sheep_fold.extract import MANIFEST_COLUMNS, extract_metadata
 from electric_sheep_fold.index import build_index
-from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.layout import (
     ARCHIVE_BASE_URL,
     BASE_URL_DEFAULT,
@@ -48,6 +47,7 @@ from electric_sheep_fold.layout import (
     flam3_filename,
     remote_url,
 )
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.manifest import MissingSet
 
 log = logging.getLogger(__name__)

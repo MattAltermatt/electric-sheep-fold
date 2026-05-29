@@ -15,8 +15,10 @@ from electric_sheep_fold import __version__
 from electric_sheep_fold.extract import is_flam3_content
 from electric_sheep_fold.layout import flam3_path, remote_url
 from electric_sheep_fold.manifest import MissingSet
-from electric_sheep_fold.migration import migrate_v0_1_if_needed
-from electric_sheep_fold.migration import verify_chunked_consistency
+from electric_sheep_fold.migration import (
+    migrate_v0_1_if_needed,
+    verify_chunked_consistency,
+)
 from electric_sheep_fold.unseal import verify_unseal_consistency
 
 log = logging.getLogger(__name__)

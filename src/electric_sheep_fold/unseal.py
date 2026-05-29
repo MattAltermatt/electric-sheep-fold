@@ -34,6 +34,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.manifest import MissingSet
@@ -140,7 +141,7 @@ def _read_manifest_rows_from_bytes(data: bytes) -> list[dict[str, str]]:
     return list(csv.DictReader(io.StringIO(data.decode("utf-8"))))
 
 
-def _load_verified_log(path: Path) -> list[dict[str, object]]:
+def _load_verified_log(path: Path) -> list[dict[str, Any]]:
     """Load the unseal-verified log (list of per-gen records)."""
     if not path.exists():
         return []

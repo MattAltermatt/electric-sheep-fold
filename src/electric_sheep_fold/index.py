@@ -708,27 +708,27 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("")
     L.append("Find genomes using a specific variation (e.g. `bipolar`):")
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.variations | index("bipolar"))) | .id\' index.json | head')  # noqa: E501
     L.append("```")
     L.append("")
-    L.append("Find pyr3-GPU-safe genomes (no NaN-prone vars, modest affine coefs, low xform count, no density estimator, no NaN malformations):")
+    L.append("Find pyr3-GPU-safe genomes (no NaN-prone vars, modest affine coefs, low xform count, no density estimator, no NaN malformations):")  # noqa: E501
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_hyper_trig | not) and (.has_edisc | not) and .max_abs_affine_coef <= 5 and .xform_count_post_symmetry <= 64 and (.has_density_estimator | not) and (.has_nan_camera | not) and (.has_nan_in_xforms | not)) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_hyper_trig | not) and (.has_edisc | not) and .max_abs_affine_coef <= 5 and .xform_count_post_symmetry <= 64 and (.has_density_estimator | not) and (.has_nan_camera | not) and (.has_nan_in_xforms | not)) | .id\' index.json | head')  # noqa: E501
     L.append("```")
     L.append("")
-    L.append("Find pyr3-parity-friendly genomes (no xaos, supersample=1, default highlight_power, has finalxform):")
+    L.append("Find pyr3-parity-friendly genomes (no xaos, supersample=1, default highlight_power, has finalxform):")  # noqa: E501
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_xaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.has_xaos | not) and .supersample == 1 and .highlight_power < 0 and .has_final_xform) | .id\' index.json | head')  # noqa: E501
     L.append("```")
     L.append("")
     L.append("Stratify genomes by symmetry kind (`null` = no `<symmetry>` element):")
     L.append("```")
-    L.append("jq '[.genomes[] | select(.kind == \"genome\") | .symmetry_kind] | group_by(.) | map({kind: .[0], count: length})' index.json")
+    L.append("jq '[.genomes[] | select(.kind == \"genome\") | .symmetry_kind] | group_by(.) | map({kind: .[0], count: length})' index.json")  # noqa: E501
     L.append("```")
     L.append("")
     L.append("Find low-complexity baseline genomes:")
     L.append("```")
-    L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_xaos | not)) | .id\' index.json | head')
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_xaos | not)) | .id\' index.json | head')  # noqa: E501
     L.append("```")
     L.append("")
     L.append("Inspect one flame in full:")

@@ -187,7 +187,8 @@ def release_build_cmd(
     index.json + ATTRIBUTION.md to --out. Re-runnable; deterministic
     output (modulo zip member timestamps).
     """
-    from datetime import date as _date, datetime as _dt
+    from datetime import date as _date
+    from datetime import datetime as _dt
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if not corpus.exists():
@@ -385,7 +386,9 @@ def chunk(
     + per-gen availability manifests + gens.json browse summary.
     Use ``release-build`` to include this artifact in a full release.
     """
-    from datetime import date as _date, datetime as _dt, timezone as _tz
+    from datetime import date as _date
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if not corpus.exists():

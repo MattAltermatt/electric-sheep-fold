@@ -194,7 +194,17 @@ The ~207-test suite runs on faith — nothing executes it on push/PR. **Fix:** a
 `pull_request` + `push: main`; pin actions to full commit SHA; top-level
 `permissions: contents: read`; enable dep caching. Highest-leverage hygiene item.
 
-## [ESF-031] infra · S · 🔧 · open — ruff + mypy config, enforced in CI
+## [ESF-031] infra · S · 🔧 · ✅ **RESOLVED (2026-05-29)** — ruff + mypy config, enforced in CI
+
+> **✅ Resolved 2026-05-29.** Added `[tool.ruff]` (select E/F/I, line-length
+> 100 — 88 was never followed) + `[tool.mypy]` (ignore-missing-imports) to
+> pyproject, plus `ruff`/`mypy` to the dev extra. Fixed all findings: auto-fixed
+> unused imports + import order, wrapped policy at 100 with `# noqa: E501` on 7
+> unsplittable INDEX.md jq-recipe literals, typed `_load_verified_log` →
+> `dict[str, Any]` (cleared 6 `int(object)` mypy errors), moved test_chunk
+> mid-file imports to top. CI `lint` job now runs `ruff check` + `mypy src`.
+> Debt turned out trivial (≈13 real items), not the M–L I'd feared.
+
 
 `.gitignore` lists `.ruff_cache/` + `.mypy_cache/` (so both run locally) but
 `pyproject.toml` has no `[tool.ruff]`/`[tool.mypy]` and the `dev` extra omits

@@ -15,7 +15,6 @@ from electric_sheep_fold.index import (
     parse_flame,
 )
 
-
 GENOME_LINEAR = (
     b'<?xml version="1.0"?>'
     b'<flame name="test" size="640 480" brightness="4">'

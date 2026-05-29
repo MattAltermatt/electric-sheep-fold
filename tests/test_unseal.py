@@ -19,7 +19,6 @@ from electric_sheep_fold.unseal import (
     verify_unseal_consistency,
 )
 
-
 FLAM3_TEMPLATE = (
     b'<?xml version="1.0"?>'
     b'<flame name="t-{id}" nick="bob" url="http://x">'

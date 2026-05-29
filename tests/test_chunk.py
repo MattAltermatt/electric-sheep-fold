@@ -5,6 +5,8 @@ storage bucket (10000) in layout.py — different concern (transfer vs archive).
 See docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md.
 """
 import json
+import tarfile
+from pathlib import Path
 
 import brotli
 
@@ -12,6 +14,7 @@ from electric_sheep_fold.chunk import (
     CHUNK_FORMAT_VERSION,
     CHUNK_SIZE,
     build_chunk_bytes,
+    build_chunks_tar,
     build_gens_json,
     chunk_filename,
     chunk_lo,
@@ -131,11 +134,8 @@ def test_gens_json_single_id_min_max_equal():
 # build_chunks_tar — corpus-chunks-{date}.tar artifact assembly
 # ---------------------------------------------------------------------------
 
-import tarfile
-from electric_sheep_fold.chunk import build_chunks_tar
 
-
-def _write_flam3(corpus: "Path", gen: int, sid: int, body: str):
+def _write_flam3(corpus: Path, gen: int, sid: int, body: str):
     f = corpus / str(gen) / f"{(sid // 10000) * 10000:05d}" / f"electricsheep.{gen}.{sid}.flam3"
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(body)
