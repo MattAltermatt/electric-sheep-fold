@@ -48,6 +48,14 @@ def ensure_corpus_initialized(corpus_root: Path) -> None:
 
 
 def _sleep_with_jitter(delay: float, jitter: float) -> None:
+    """Sleep the polite inter-request gap: `delay` plus 0–`jitter` seconds.
+
+    One-sided ON PURPOSE (ESF-020): the wait is in `[delay, delay+jitter]` —
+    e.g. base 20s + 0–5s → [20s, 25s] for the live server — never below the
+    base delay. This module is the source of truth for the cadence; do NOT
+    "symmetrize" it to `delay ± jitter` (that would allow faster-than-base
+    requests against a volunteer server).
+    """
     if delay > 0:
         wait = delay + (random.uniform(0, jitter) if jitter > 0 else 0.0)
         time.sleep(wait)

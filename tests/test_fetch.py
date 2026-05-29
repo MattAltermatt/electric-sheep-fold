@@ -265,3 +265,26 @@ class TestFetchAll:
             upper=5, delay=0, jitter=0,
         )
         assert seen_ids == [0, 1, 2, 3, 4]
+
+
+class TestSleepJitterOneSided:
+    """ESF-020: the inter-request wait is [delay, delay+jitter] — never below
+    the base delay. Locks the one-sided cadence (the code is the source of
+    truth); a switch to symmetric `delay ± jitter` must fail here."""
+
+    def test_wait_bounds_are_base_to_base_plus_jitter(self, monkeypatch):
+        import electric_sheep_fold.fetch as f
+        waits: list[float] = []
+        monkeypatch.setattr(f.time, "sleep", lambda s: waits.append(s))
+        monkeypatch.setattr(f.random, "uniform", lambda lo, hi: lo)  # min draw
+        f._sleep_with_jitter(20.0, 5.0)
+        monkeypatch.setattr(f.random, "uniform", lambda lo, hi: hi)  # max draw
+        f._sleep_with_jitter(20.0, 5.0)
+        assert waits == [20.0, 25.0]  # floor is the base delay, never less
+
+    def test_zero_delay_means_no_sleep(self, monkeypatch):
+        import electric_sheep_fold.fetch as f
+        waits: list[float] = []
+        monkeypatch.setattr(f.time, "sleep", lambda s: waits.append(s))
+        f._sleep_with_jitter(0.0, 5.0)
+        assert waits == []  # zero delay → no sleep (skip-without-network ethos)

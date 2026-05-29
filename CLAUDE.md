@@ -52,8 +52,9 @@ index in sync with the corpus.
 These must NOT be violated without a deliberate spec update:
 
 - **Politeness:** two cadences by endpoint type:
-  - **Live sheep server (`v3d0.sheepserver.net/gen/{247,248}/...`):** 20s ±5s
-    jitter, **strictly sequential**, identifiable User-Agent. The live server
+  - **Live sheep server (`v3d0.sheepserver.net/gen/{247,248}/...`):** 20s base
+    + 0–5s jitter (range [20–25s], one-sided by design — see `_sleep_with_jitter`,
+    ESF-020), **strictly sequential**, identifiable User-Agent. The live server
     generates fresh genomes; treat it as expensive and rare. No parallelism.
   - **Static archive (`electricsheep.com/archives/...`):** 2s ±1s jitter per
     worker, **modest cross-gen parallelism allowed** (4 workers historically).

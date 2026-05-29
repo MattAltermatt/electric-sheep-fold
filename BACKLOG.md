@@ -71,7 +71,15 @@ pick one truth — bump to `0.5.0` to match the toolchain, or adopt `hatch-vcs`,
 document that the package version intentionally tracks the toolchain spec, not the
 release tag. Sync `__init__.__version__` to match.
 
-## [ESF-020] bug · XS · 🐛 · open — politeness jitter is one-sided
+## [ESF-020] bug · XS · 🐛 · ✅ **RESOLVED (2026-05-29)** — politeness jitter is one-sided
+
+> **✅ Resolved 2026-05-29 (docs-to-code, no behavior change).** User decision:
+> the code is the source of truth — `[20s, 25s]` (20s base + 0–5s) is *more*
+> polite than the literal "±5s" and stays that way. Corrected the wording in
+> CLAUDE.md / README / operations.md to match, documented the one-sided design
+> in `_sleep_with_jitter`, and locked it with `test_fetch.py::TestSleepJitterOneSided`
+> so it can't be "symmetrized" later.
+
 
 `fetch.py:49-52` computes `delay + uniform(0, jitter)` → range `[delay,
 delay+jitter]`, i.e. `[20, 25]`. The spec says "20s ±5s" = `[15, 25]`. Always ≥

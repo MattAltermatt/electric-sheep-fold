@@ -11,7 +11,8 @@ All commands assume `cwd` is the repository root.
 ## Live-fetch daemon
 
 The daemon is `sheep-fold fetch-all` wrapped in a `nohup` chain that
-iterates gens 247 → 248 sequentially, honoring the 20s ± 5s polite cadence
+iterates gens 247 → 248 sequentially, honoring the 20–25s polite cadence
+(20s base + 0–5s jitter)
 against `v3d0.sheepserver.net`. State is captured in `.flam3` files on
 disk + `corpus/{gen}/missing.txt`; resume is automatic via skip-local +
 skip-known-missing.

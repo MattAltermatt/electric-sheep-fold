@@ -127,7 +127,7 @@ recoverable from git history — see [`docs/operations.md`](docs/operations.md)
 The live ES server (`v3d0.sheepserver.net`, lighttpd 1.4.33) and the
 electricsheep.com archive (S3 backed) are volunteer / shared infrastructure
 preserving 20+ years of crowdsourced generative art. `sheep-fold` treats
-them accordingly: **20s ± 5s sequential** for v3d0, **2s ± 1s** per worker
+them accordingly: **20–25s sequential** (20s base + 0–5s jitter) for v3d0, **2s ± 1s** per worker
 for the archive (modest cross-gen parallelism OK). Identifiable User-Agent;
 sticky-404 memory (`corpus/{gen}/missing.txt`) so we never re-probe known
 gaps. The full politeness contract is documented in [CLAUDE.md](CLAUDE.md).

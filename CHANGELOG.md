@@ -8,7 +8,7 @@
 
 ## Pending — next dated release
 
-### Phase 12g — code-review correctness pass (ESF-017–019, 021, 022)
+### Phase 12g — code-review correctness pass (ESF-017–022)
 
 Confirmed bugs + a metadata cleanup found in a three-critic whole-codebase
 review, each fixed with regression tests:
@@ -35,7 +35,12 @@ review, each fixed with regression tests:
   junk raised the same parse error as a real multi-flame animation and was
   mislabeled `animation`/`valid`; it is now `corrupt` unless ≥2 flames present.
 
-Remaining review findings tracked as ESF-020, ESF-023..037 in [BACKLOG](BACKLOG.md).
+- **ESF-020 — jitter cadence.** Confirmed the live-fetch inter-request wait is
+  `[20s, 25s]` (20s base + 0–5s, one-sided) and that this is the intended,
+  more-polite behavior. Docs reworded to match the code, the design noted in
+  `_sleep_with_jitter`, and a lock test added so it stays one-sided.
+
+Remaining review findings tracked as ESF-023..037 in [BACKLOG](BACKLOG.md).
 
 ### Phase 12f — delivery-chunk artifact + `sheep-fold chunk` CLI
 
