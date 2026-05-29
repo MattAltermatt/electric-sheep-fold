@@ -56,7 +56,14 @@ poisoned `.flam3`, then marks that id `skip_local` so the bad data is permanent.
 the check is a transient error (no write, no missing-entry, retry/sleep). Add a
 fetch test for the `none\n`-body case.
 
-## [ESF-019] chore · XS · 🔧 · open — version metadata drift (3-way)
+## [ESF-019] chore · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — version metadata drift (3-way)
+
+> **✅ Resolved 2026-05-29.** Collapsed to a single source: `__init__.__version__`
+> = `0.5.0`; `pyproject` now declares `dynamic = ["version"]` with
+> `[tool.hatch.version] path = "src/electric_sheep_fold/__init__.py"`, so the
+> packaged metadata is read from the code and can't drift. `pip install -e .`
+> rebuilt metadata to `0.5.0`. Regression test `test_version.py` asserts the
+> single-source wiring + that the User-Agent carries the version.
 
 `pyproject.toml:3` = `0.2.5`, `__init__.py:3` = `0.2.3`, actual code state =
 v0.4/v0.5. The semver field is orphaned under the ISO-date release model. **Fix:**

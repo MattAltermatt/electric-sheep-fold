@@ -8,10 +8,10 @@
 
 ## Pending — next dated release
 
-### Phase 12g — code-review correctness pass (ESF-017, ESF-018)
+### Phase 12g — code-review correctness pass (ESF-017, ESF-018, ESF-019)
 
-Two confirmed data-integrity bugs found in a three-critic whole-codebase
-review, fixed with regression tests:
+Confirmed bugs + a metadata cleanup found in a three-critic whole-codebase
+review, each fixed with regression tests:
 
 - **ESF-017 — 6-digit sheep ids.** `_FLAM3_RE` matched exactly `\d{5}`, so any
   sheep id ≥ 100,000 was silently dropped by `import`, `index`,
@@ -24,7 +24,11 @@ review, fixed with regression tests:
   is now gated on `is_flam3_content()`; a non-flam3 200 is a transient error
   (no write, no missing-entry).
 
-Remaining review findings tracked as ESF-019..037 in [BACKLOG](BACKLOG.md).
+- **ESF-019 — version drift.** `pyproject` (`0.2.5`), `__init__` (`0.2.3`), and
+  the actual v0.5 code all disagreed. Collapsed to one source: `__version__`
+  in code, with `pyproject` reading it via hatch `dynamic` version. Now `0.5.0`.
+
+Remaining review findings tracked as ESF-020..037 in [BACKLOG](BACKLOG.md).
 
 ### Phase 12f — delivery-chunk artifact + `sheep-fold chunk` CLI
 
