@@ -236,6 +236,25 @@ class TestIterCorpusFlames:
         assert sealed_flags[(244, 2)] is True
         assert sealed_flags[(247, 50)] is False
 
+    def test_hybrid_sealed_plus_loose_yields_once_loose_wins(self, tmp_path: Path):
+        """ESF-024: when the SAME id exists in both a leftover sealed zip and
+        the migrated loose tree (a real transit state), it must be yielded
+        exactly once — the loose v0.4-native copy wins (sealed=False)."""
+        corpus = tmp_path / "corpus"
+        _make_sealed_zip(
+            corpus / "244" / "00000-00099.zip", 244, {1: b"<flame>sealed</flame>"}
+        )
+        loose = corpus / "244" / "00000"
+        loose.mkdir(parents=True)
+        (loose / "electricsheep.244.00001.flam3").write_bytes(b"<flame>loose</flame>")
+
+        flames = list(iter_corpus_flames(corpus))
+        matching = [f for f in flames if (f[0], f[1]) == (244, 1)]
+        assert len(matching) == 1          # not double-emitted
+        _, _, content, sealed = matching[0]
+        assert sealed is False             # loose (native) wins over sealed transit
+        assert content == b"<flame>loose</flame>"
+
 
 class TestBuildIndex:
     def test_emits_index_and_md(self, tmp_path: Path):

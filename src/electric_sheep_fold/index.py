@@ -349,6 +349,24 @@ def iter_corpus_flames(corpus_root: Path):
         if not gen_dir.is_dir() or not gen_dir.name.isdigit():
             continue
         gen = int(gen_dir.name)
+        # ESF-024: in a hybrid transit state the same id can appear in BOTH a
+        # leftover sealed zip and the migrated loose tree (and a v0.3-flat file
+        # can shadow its v0.4-chunked copy). Yield each id once. The loose
+        # v0.4-native copy is canonical, so walk loose FIRST and let it win;
+        # the sealed zip only fills ids not already present loose.
+        seen: set[int] = set()
+        # v0.4 native shape: loose flam3s under per-10k bucket subdirs. rglob
+        # handles both v0.3 flat (transient pre-migrate-chunked) and v0.4
+        # chunked layouts transparently.
+        for path in sorted(gen_dir.rglob(f"electricsheep.{gen}.*.flam3")):
+            m = _FLAM3_RE.match(path.name)
+            if not m:
+                continue
+            sid = int(m.group(2))
+            if sid in seen:
+                continue
+            seen.add(sid)
+            yield gen, sid, path.read_bytes(), False
         # v0.2 transit shape: sealed zip alongside / instead of loose files.
         for zip_path in sorted(gen_dir.glob("?????-?????.zip")):
             with zipfile.ZipFile(zip_path, "r") as zf:
@@ -356,15 +374,11 @@ def iter_corpus_flames(corpus_root: Path):
                     m = _FLAM3_RE.match(name)
                     if not m:
                         continue
-                    yield gen, int(m.group(2)), zf.read(name), True
-        # v0.4 native shape: loose flam3s under per-10k bucket subdirs.
-        # rglob handles both v0.3 flat (transient pre-migrate-chunked) and
-        # v0.4 chunked layouts transparently.
-        for path in sorted(gen_dir.rglob(f"electricsheep.{gen}.*.flam3")):
-            m = _FLAM3_RE.match(path.name)
-            if not m:
-                continue
-            yield gen, int(m.group(2)), path.read_bytes(), False
+                    sid = int(m.group(2))
+                    if sid in seen:
+                        continue
+                    seen.add(sid)
+                    yield gen, sid, zf.read(name), True
 
 
 def build_index(
