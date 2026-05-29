@@ -8,6 +8,14 @@
 
 ## Pending — next dated release
 
+### Phase 12i — continuous integration (ESF-030)
+
+First CI for the repo: `.github/workflows/ci.yml` runs `pytest` on every push
+to `main` and every PR, across Python 3.11 / 3.12 / 3.13. Hardened per current
+GitHub guidance — actions pinned to full commit SHA, least-privilege
+`permissions: contents: read`, uv cache, and `uv sync --locked` (which also
+fails the build if `uv.lock` drifts from `pyproject.toml`).
+
 ### Phase 12h — supply-chain hardening (ESF-026, ESF-028)
 
 - **ESF-026 — defused XML.** Untrusted network `.flam3` is now parsed with

@@ -1,0 +1,39 @@
+name: CI
+
+# ESF-030: run the test suite on every push to main and every PR.
+# Hardening per current GitHub guidance:
+#   - actions pinned to full commit SHA (tag in trailing comment)
+#   - least-privilege token (contents: read only)
+#   - matrix exercises the requires-python = ">=3.11" claim across 3.11–3.13
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Set up uv + Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install (locked, with dev extra)
+        run: uv sync --locked --extra dev
+      - name: Run tests
+        run: uv run pytest

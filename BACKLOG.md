@@ -179,7 +179,15 @@ and publishes public artifacts, commit the lockfile.
 `integrity=`/`crossorigin`. Low priority — the page is currently an untracked
 local artifact — but add SRI before it's ever published.
 
-## [ESF-030] infra · S · 🔧 · open — stand up CI (no `.github/workflows/` exists)
+## [ESF-030] infra · S · 🔧 · ✅ **RESOLVED (2026-05-29)** — stand up CI (no `.github/workflows/` exists)
+
+> **✅ Resolved 2026-05-29.** Added `.github/workflows/ci.yml`: pytest on
+> `push: main` + `pull_request`, matrix py3.11/3.12/3.13, actions SHA-pinned
+> (`checkout` v6.0.2, `setup-uv` v8.1.0), top-level `permissions: contents:
+> read`, uv cache, `uv sync --locked` (also guards the lockfile). First live
+> run happens when the branch is pushed / a PR opens. **Follow-ups:** ESF-031
+> (add ruff+mypy steps), ESF-036 (require this check via a branch ruleset).
+
 
 The ~207-test suite runs on faith — nothing executes it on push/PR. **Fix:** add
 `ci.yml` running `pytest` across a `python-version: [3.11, 3.12, 3.13]` matrix on
