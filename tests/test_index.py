@@ -182,6 +182,15 @@ class TestPerXformVariationCounts:
         assert rec["kind"] == "animation"
         assert rec["frame_count"] == 3
 
+    def test_single_flame_with_trailing_junk_is_corrupt(self):
+        # ESF-022: "<flame>…</flame>GARBAGE" raises the SAME "junk after
+        # document element" parse error as a real multi-flame animation, but it
+        # is a single corrupt file — not an animation. Only ≥2 <flame
+        # occurrences qualify as an animation.
+        rec = parse_flame(b"<flame>ok</flame>CORRUPT_TRAILER", 247, 9)
+        assert rec["kind"] == "corrupt"
+        assert rec["valid"] is False
+
     def test_get_envelope_treated_as_genome(self):
         # Archive's <get>-wrapped envelope; inner flame is the canonical genome.
         # Test data deliberately omits the leading <?xml?> decl since it would

@@ -100,7 +100,14 @@ def parse_flame(content: bytes, gen: int, sheep_id: int) -> dict:
     except ET.ParseError as exc:
         msg = str(exc)
         if "junk after document element" in msg:
-            return _index_animation(rec, stripped)
+            # The parser read a valid first root element, then hit more bytes.
+            # That's a multi-flame animation ONLY if ≥2 <flame markers are
+            # present; a single "<flame>…</flame>GARBAGE" is corrupt, not a
+            # 1-frame animation (ESF-022).
+            if stripped.count(b"<flame ") + stripped.count(b"<flame>") >= 2:
+                return _index_animation(rec, stripped)
+            rec.update(kind="corrupt", valid=False, error="junk-after-document")
+            return rec
         # Archive sometimes wraps in <get>...</get>; try synthetic root.
         try:
             wrapper = ET.fromstring(b"<sheep>" + stripped + b"</sheep>")
