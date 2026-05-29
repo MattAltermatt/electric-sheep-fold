@@ -80,14 +80,26 @@ mismatch. **Fix:** `delay + uniform(-jitter, jitter)` with a `max(0, …)` floor
 **preserve the 20/5 constants** (politeness values are sacrosanct; this changes
 only the formula's symmetry), or document the asymmetry as intentional.
 
-## [ESF-021] bug · XS · 🐛 · open — `build_chunks_tar` aborts on one non-UTF-8 flam3
+## [ESF-021] bug · XS · 🐛 · ✅ **RESOLVED (2026-05-29, `55c18b8`)** — `build_chunks_tar` aborts on one non-UTF-8 flam3
+
+> **✅ Resolved 2026-05-29.** `read_text` is now wrapped; a `UnicodeDecodeError`
+> skips the file (excluded from BOTH avail and chunk so they stay consistent)
+> with a warning, instead of aborting the artifact. Test
+> `test_chunk.py::test_build_chunks_tar_skips_non_utf8_file`.
+
 
 `chunk.py:211` uses `read_text(encoding="utf-8")`; a single non-UTF-8 `.flam3`
 (reachable via ESF-018, or rare attr-value bytes) raises `UnicodeDecodeError` and
 kills the whole artifact build. **Fix:** `read_bytes().decode("utf-8",
 errors="replace")` or per-file try/except + warning skip.
 
-## [ESF-022] bug · S · 🐛 · open — corrupt files misclassified as valid animations
+## [ESF-022] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `04808ba`)** — corrupt files misclassified as valid animations
+
+> **✅ Resolved 2026-05-29.** The "junk after document element" branch now
+> requires ≥2 `<flame` markers to be classified as an animation; otherwise the
+> file is `corrupt` (`error="junk-after-document"`). Test
+> `test_index.py::…::test_single_flame_with_trailing_junk_is_corrupt`.
+
 
 `index.py:100-102` routes any `"junk after document element"` parse error to
 `_index_animation` (→ `kind="animation"`, `valid=True`). A genuinely corrupt

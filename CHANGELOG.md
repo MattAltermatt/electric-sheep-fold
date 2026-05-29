@@ -8,7 +8,7 @@
 
 ## Pending — next dated release
 
-### Phase 12g — code-review correctness pass (ESF-017, ESF-018, ESF-019)
+### Phase 12g — code-review correctness pass (ESF-017–019, 021, 022)
 
 Confirmed bugs + a metadata cleanup found in a three-critic whole-codebase
 review, each fixed with regression tests:
@@ -28,7 +28,14 @@ review, each fixed with regression tests:
   the actual v0.5 code all disagreed. Collapsed to one source: `__version__`
   in code, with `pyproject` reading it via hatch `dynamic` version. Now `0.5.0`.
 
-Remaining review findings tracked as ESF-020..037 in [BACKLOG](BACKLOG.md).
+- **ESF-021 — non-UTF-8 flam3.** `build_chunks_tar` aborted the whole delivery
+  artifact on a single non-UTF-8 file; it now skips that file (excluded from
+  avail + chunk, which must agree) and keeps building.
+- **ESF-022 — corrupt vs animation.** A single `<flame>…</flame>` with trailing
+  junk raised the same parse error as a real multi-flame animation and was
+  mislabeled `animation`/`valid`; it is now `corrupt` unless ≥2 flames present.
+
+Remaining review findings tracked as ESF-020, ESF-023..037 in [BACKLOG](BACKLOG.md).
 
 ### Phase 12f — delivery-chunk artifact + `sheep-fold chunk` CLI
 
