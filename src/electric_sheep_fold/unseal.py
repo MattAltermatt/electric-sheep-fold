@@ -35,11 +35,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.manifest import MissingSet
 
 log = logging.getLogger(__name__)
 
-_FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
 _SEALED_ZIP_RE = re.compile(r"^\d{5}-\d{5}\.zip$")
 _GEN_DIR_RE = re.compile(r"^\d+$")
 

@@ -31,6 +31,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
+
 INDEX_SCHEMA_VERSION = 5
 
 # Pyr3 AutoRoute GPU-safety: variations whose f32 denominator cancels at
@@ -67,7 +69,6 @@ VARIATIONS: frozenset[str] = frozenset({
 IDENTITY_POST = "1 0 0 1 0 0"
 
 _XML_DECL_RE = re.compile(rb"^\s*<\?xml[^?]*\?>\s*", re.DOTALL)
-_FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
 # v0.5 malformation detection: whole-word, case-insensitive `nan` token.
 # Bounded by non-alphanumerics so "banana" / "unanchored" / "nano" don't match.
 _NAN_TOKEN_RE = re.compile(r"(?i)(?<![a-z0-9])nan(?![a-z0-9])")

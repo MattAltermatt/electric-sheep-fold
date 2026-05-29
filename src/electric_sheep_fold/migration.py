@@ -23,13 +23,13 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.layout import bucket_for, flam3_path
 from electric_sheep_fold.manifest import MissingSet
 
 log = logging.getLogger(__name__)
 
 _BUCKET_RE = re.compile(r"^(\d{2})xxx$")
-_FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
 
 CHUNKED_VERIFIED_FILENAME = "_chunked-verified.json"
 

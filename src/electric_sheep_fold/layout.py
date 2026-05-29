@@ -1,10 +1,18 @@
 """Pure path / URL math for electric-sheep-fold. No I/O. (v0.4 chunked corpus.)"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 BASE_URL_DEFAULT = "http://v3d0.sheepserver.net"
 ARCHIVE_BASE_URL = "https://electricsheep.com/archives"
+
+# Canonical corpus filename: electricsheep.{gen}.{id}.flam3. The id group is
+# `\d{5,}` — `flam3_filename` zero-pads to a MINIMUM of 5 digits, so ids
+# ≥ 100,000 grow to 6+ digits (ESF-017). Single source of truth: every consumer
+# (importer / index / migration / release / unseal) imports THIS, never its own
+# copy, so the digit-width contract can't drift between modules.
+FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5,})\.flam3$")
 
 # Live gens — actively served by v3d0.sheepserver.net. `fetch` / `fetch-all`
 # refuse other gens to prevent accidental live-server probes for dead gens

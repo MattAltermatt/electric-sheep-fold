@@ -38,6 +38,7 @@ from typing import Callable
 from electric_sheep_fold.chunk import build_chunks_tar
 from electric_sheep_fold.extract import MANIFEST_COLUMNS, extract_metadata
 from electric_sheep_fold.index import build_index
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.layout import (
     ARCHIVE_BASE_URL,
     BASE_URL_DEFAULT,
@@ -51,7 +52,6 @@ from electric_sheep_fold.manifest import MissingSet
 
 log = logging.getLogger(__name__)
 
-_FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
 _SEALED_ZIP_RE = re.compile(r"^\d{5}-\d{5}\.zip$")
 _GEN_DIR_RE = re.compile(r"^\d+$")
 

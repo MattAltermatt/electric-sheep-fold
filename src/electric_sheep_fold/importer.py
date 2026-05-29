@@ -2,18 +2,16 @@
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from electric_sheep_fold.fetch import _atomic_write_flam3, ensure_corpus_initialized
+from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 from electric_sheep_fold.layout import flam3_path
 from electric_sheep_fold.manifest import MissingSet
 from electric_sheep_fold.migration import migrate_v0_1_if_needed
 
 log = logging.getLogger(__name__)
-
-_FLAM3_RE = re.compile(r"^electricsheep\.(\d+)\.(\d{5})\.flam3$")
 
 
 @dataclass

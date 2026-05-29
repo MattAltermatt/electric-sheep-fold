@@ -4,6 +4,7 @@ from pathlib import Path
 from electric_sheep_fold.layout import (
     ARCHIVE_BASE_URL,
     BASE_URL_DEFAULT,
+    FLAM3_RE,
     LIVE_GENS,
     archive_url,
     bucket_for,
@@ -27,6 +28,35 @@ class TestFlam3Filename:
 
     def test_padding_different_gen(self):
         assert flam3_filename(244, 16) == "electricsheep.244.00016.flam3"
+
+
+class TestFlam3Re:
+    """ESF-017: the canonical filename regex must accept ids ≥ 100,000.
+
+    `flam3_filename` pads to a MINIMUM of 5 digits, so ids ≥ 100,000 produce
+    6-digit forms. A `\\d{5}` pattern silently drops them from index / import /
+    migrate / release / verify. The shared regex uses `\\d{5,}`.
+    """
+
+    def test_matches_five_digit_id(self):
+        m = FLAM3_RE.match(flam3_filename(248, 12_345))
+        assert m is not None
+        assert m.group(1) == "248"
+        assert m.group(2) == "12345"
+
+    def test_matches_six_digit_id(self):
+        # The ESF-017 regression: id ≥ 100000 → 6-digit filename.
+        m = FLAM3_RE.match(flam3_filename(248, 100_000))
+        assert m is not None
+        assert m.group(2) == "100000"
+
+    def test_rejects_short_unpadded_id(self):
+        # A literal 3-digit id is malformed (the tool always pads to ≥5).
+        assert FLAM3_RE.match("electricsheep.248.123.flam3") is None
+
+    def test_rejects_non_flam3(self):
+        assert FLAM3_RE.match("MANIFEST.csv") is None
+        assert FLAM3_RE.match("electricsheep.248.00100.flam3.tmp") is None
 
 
 class TestBucketFor:
