@@ -35,6 +35,11 @@ index in sync with the corpus.
 - **Branches:** `feature/<topic>` for work. FF-merge to `main` after user verify.
 - **Docs are ship dependencies:** README, VISION, ROADMAP, CHANGELOG, BACKLOG all
   track code. Update in the same commit as the code they describe.
+- **Task tracking (pyr3-style):** every open task carries an `[ESF-NNN]` ID in
+  [BACKLOG.md](BACKLOG.md) with flags `category · size · sigil · status`. Bump the
+  Next-ID pointer at the top when filing; never reuse an ID, even for shipped/
+  removed work. Shipped tickets move to [CHANGELOG.md](CHANGELOG.md); phase
+  narrative lives in [ROADMAP.md](ROADMAP.md).
 - **Releases tagged by ISO build date** (`YYYY-MM-DD`), not semver. This is
   a corpus archive woken occasionally to fetch more sheep + ship; each
   release is a snapshot in time. Tag = same date stamped into artifact
