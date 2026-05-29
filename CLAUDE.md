@@ -142,11 +142,12 @@ These must NOT be violated without a deliberate spec update:
   release zip contains `MANIFEST.csv` (11-col schema from v0.2 spec
   §4.1, still authoritative — unchanged through v0.4) + `missing.txt`
   (sticky-404 ids, id-per-line). The pyr3-facing index aggregates from
-  both. Schemas in:
-  [`docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md`](docs/superpowers/specs/2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md) §4.1 (manifest),
-  [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md) §3 (v0.3 release artifact),
-  [`docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md`](docs/superpowers/specs/2026-05-23-v0.4-chunked-dated-release-and-index.md) (v0.4 chunked + dated + index v4),
-  [`docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md`](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md) (v0.5 NaN flags + symmetry_kind always-present + has_chaos→has_xaos).
+  both. Schemas in the internal specs (gitignored; on disk under
+  `docs/superpowers/specs/`):
+  `2026-05-20-electric-sheep-fold-v0.2-chunked-zip.md` §4.1 (manifest),
+  `2026-05-22-v0.3-loose-corpus.md` §3 (v0.3 release artifact),
+  `2026-05-23-v0.4-chunked-dated-release-and-index.md` (v0.4 chunked + dated + index v4),
+  `2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md` (v0.5 NaN flags + symmetry_kind always-present + has_chaos→has_xaos).
 - **Delivery-chunk artifact** (`corpus-chunks-{date}.tar`). Built on demand
   into `build/release/` by `sheep-fold release-build` or standalone
   `sheep-fold chunk`. This is a distinct artifact from the per-gen `.zip`
@@ -173,7 +174,8 @@ These must NOT be violated without a deliberate spec update:
     evolve separately.
   - `chunk.py` is the single source of truth for chunk math (`CHUNK_SIZE`,
     `chunk_lo()`, etc.).
-  Spec: [`docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md`](docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md).
+  Spec: `2026-05-28-corpus-share-url-and-chunk-delivery-design.md` (internal,
+  gitignored under `docs/superpowers/specs/`).
 
 ## Where things live
 
@@ -191,5 +193,5 @@ These must NOT be violated without a deliberate spec update:
   were removed in v0.4 after all 8 dead flam3-bearing gens were fully
   preserved (2026-05-21); see `docs/operations.md` §"Preserve a new dead
   generation" for recovery from git history if ES ever rolls a new dead gen.
-- `docs/superpowers/specs/` — design specs (v0.1 / v0.2 / v0.2.1 / v0.3 / v0.4 / v0.5)
-- `docs/superpowers/plans/` — implementation plans
+- `docs/superpowers/` — internal design specs + implementation plans
+  (gitignored; kept on disk for local/dev reference, not published)

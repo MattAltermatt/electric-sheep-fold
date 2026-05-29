@@ -22,6 +22,10 @@ venv/
 # Already covered by `build/` above; kept explicit for the corpus context.
 /build/
 
+# Internal scaffolding — design specs + implementation plans. Kept on disk
+# for local/dev reference, not part of the published repo or any release.
+/docs/superpowers/
+
 # Session-local scratch (handoff notes, daily logs) — never commit
 /.remember/
 

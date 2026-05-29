@@ -257,7 +257,7 @@ unzip -p gen-244.zip electricsheep.244.42746.flam3
 
 The pyr3-limitation fields (`has_xaos`, `supersample`, `highlight_power`)
 are not generic — they're chosen because pyr3 has **known limitations** in
-those areas (see `../pyr3/parity/goldens/*/README.md` for the running list).
+those areas (see the pyr3 repo's `parity/goldens/*/README.md` for the running list).
 An agentic query for "a flame pyr3 can parity-render" needs to filter these
 out. If pyr3 grows new limitations or graduates old ones, extend
 `src/electric_sheep_fold/index.py` and document the new field here.

@@ -44,7 +44,7 @@ deploy, no CORS, no third-party CDN.
 `sheep-fold chunk` CLI + calls `build_chunks_tar()` from
 `release-build`. 242/242 tests green.
 
-Spec: [`docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md`](docs/superpowers/specs/2026-05-28-corpus-share-url-and-chunk-delivery-design.md).
+Spec: `2026-05-28-corpus-share-url-and-chunk-delivery-design.md` (internal scaffolding).
 
 ### Phase 12e — index schema v5: malformation flags + xaos rename
 
@@ -96,7 +96,7 @@ specific quality flags ("renders as single dot," "GPU banding") stay in
 each consumer's divergence log; v4-compat reader (consumers re-pull on
 schema bump).
 
-Spec: [`docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md`](docs/superpowers/specs/2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md).
+Spec: `2026-05-23-v0.5-index-malformation-flags-and-xaos-rename.md` (internal scaffolding).
 
 ## 2026-05-23 — chunked layout + dated artifacts + pyr3 AutoRoute index
 
@@ -267,7 +267,7 @@ The 8 dead gens (165, 169, 191, 198, 242–245) are tight — loose count +
 missing.txt count exactly equals the claimed range — so no catchup
 happens there.
 
-Spec: [`docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md`](docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md).
+Spec: `2026-05-22-v0.3-loose-corpus.md` (internal scaffolding).
 v0.2.5 is the off-machine fallback artifact (final sealed-shape snapshot).
 
 ## v0.2.5 — 2026-05-22
@@ -435,7 +435,7 @@ import --whole-gen` for dead gens. Extending the set when ES rolls gen 249 is
 a one-line edit in `layout.py`. 12 new CLI guard tests (160 total green).
 
 Gen 247 ingested into the chunked 10k-id layout from `corpus/_scrape-247/`
-(9007 flam3s preseeded from `~/dev/sheep/247/`, ids `0`–`25845`) → three
+(9007 flam3s preseeded from a local mirror, ids `0`–`25845`) → three
 working chunks `00000-09999`, `10000-19999`, `20000-29999` in `corpus/247/`.
 No auto-seal yet (no `missing.txt` to prove range completion); chunks will
 seal naturally as `fetch-all --gen 247` against v3d0 fills the gaps. Source
@@ -450,8 +450,7 @@ sourced via `v3d0.sheepserver.net`) keep their 10k-chunk layout — the gen's
 biography is encoded in the chunk shape itself, and a gen's shape is fixed
 at first preservation (no re-chunking when an upstream gen eventually dies).
 
-Spec:
-[`docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md`](docs/superpowers/specs/2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md).
+Spec: `2026-05-21-electric-sheep-fold-v0.2.1-dead-gen-whole-zip.md` (internal scaffolding).
 
 Code changes:
 - `layout.archive_url(gen, id)` — new helper for `electricsheep.com/archives`

@@ -1,10 +1,10 @@
 # 🛠️ Operations runbook
 
 Day-to-day tasks for the corpus + the `sheep-fold` toolchain. This is the
-**how-do-I-...** doc; design rationale lives in [VISION](../VISION.md),
-[ROADMAP](../ROADMAP.md), and the [specs](superpowers/specs/).
+**how-do-I-...** doc; design rationale lives in [VISION](../VISION.md) and
+[ROADMAP](../ROADMAP.md).
 
-All commands assume `cwd = /Users/matt/dev/MattAltermatt/electric-sheep-fold`.
+All commands assume `cwd` is the repository root.
 
 ---
 
@@ -264,8 +264,8 @@ non-obvious), no `Co-Authored-By` trailer, identity is set
   will never re-probe it. If ES ever changes numbering semantics
   (currently append-only — gaps stay gaps), the `--retry-missing`
   flag in the BACKLOG would be needed.
-- **Local archive layout differs from corpus layout.** `/Users/matt/dev/sheep/247`
-  uses stripped filenames (no `electricsheep.247.` prefix); the importer
+- **Local archive layout differs from corpus layout.** A local source mirror
+  may use stripped filenames (no `electricsheep.247.` prefix); the importer
   handles this automatically but be aware if doing manual diffs.
 
 ---
@@ -276,7 +276,5 @@ non-obvious), no `Co-Authored-By` trailer, identity is set
 - [VISION](../VISION.md) — why this corpus exists
 - [ROADMAP](../ROADMAP.md) — phases shipped and planned
 - [CLAUDE.md](../CLAUDE.md) — invariants + collaboration conventions
-- [v0.3 spec](superpowers/specs/2026-05-22-v0.3-loose-corpus.md) — the
-  current corpus shape and CLI surface
 - [`.claude/skills/pyr3-corpus-index/SKILL.md`](../.claude/skills/pyr3-corpus-index/SKILL.md)
   — agentic queries against the index

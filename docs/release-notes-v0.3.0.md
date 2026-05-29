@@ -80,8 +80,7 @@ provenance per gen, no behavior change on the indexing or query side.
 `--whole-gen` flag are retired (sealing was v0.2 working-dir ceremony;
 flat-write is the default now).
 
-See spec [`v0.3 loose-corpus`](https://github.com/MattAltermatt/electric-sheep-fold/blob/main/docs/superpowers/specs/2026-05-22-v0.3-loose-corpus.md)
-for the full design rationale.
+See the internal `v0.3 loose-corpus` design spec for the full rationale.
 
 ## License
 
