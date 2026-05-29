@@ -21,7 +21,12 @@ Three-critic whole-codebase review (correctness · security · modern-GitHub
 standards). Top two are confirmed data-integrity bugs and are queued for the
 next work block.
 
-## [ESF-017] bug · S · 🐛 · **next-release** — `_FLAM3_RE` `\d{5}` silently drops ids ≥ 100,000
+## [ESF-017] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `1b6552a`)** — `_FLAM3_RE` `\d{5}` silently drops ids ≥ 100,000
+
+> **✅ Resolved 2026-05-29.** Centralized the pattern as `FLAM3_RE` in
+> `layout.py` with `\d{5,}`; repointed all five consumers (importer / index /
+> migration / release / unseal) at it, deleting the five copies. Regression
+> test in `test_layout.py::TestFlam3Re` (5- and 6-digit ids). 250 tests green.
 
 **Symptom (verified 2026-05-29):** all five copies of `_FLAM3_RE` use `(\d{5})`
 — exactly five digits — but `layout.flam3_filename` formats ids with `:05d`
@@ -34,7 +39,13 @@ written to disk correctly by `fetch` but then invisible to `import`, `index`,
 regression test with a 6-digit id. Consider centralizing the regex in `layout.py`
 so there's one source of truth.
 
-## [ESF-018] bug · S · 🐛 · **next-release** — `fetch.py` writes unvalidated 200-OK bodies to corpus
+## [ESF-018] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `e51396d`)** — `fetch.py` writes unvalidated 200-OK bodies to corpus
+
+> **✅ Resolved 2026-05-29.** Gated the 200 write on
+> `is_flam3_content(response.content)`; a non-flam3 200 (the `none\n` sentinel,
+> an HTML error page) is now a transient error — no write, no missing-entry, no
+> skip-local poisoning. Regression tests in
+> `test_fetch.py::TestFetchRange200NonFlame`.
 
 **Symptom (verified 2026-05-29):** `is_flam3_content()` exists (`extract.py:38`,
 fully tested against `none\n` / HTML / empty) but has **zero callers**. `fetch.py`

@@ -8,6 +8,24 @@
 
 ## Pending — next dated release
 
+### Phase 12g — code-review correctness pass (ESF-017, ESF-018)
+
+Two confirmed data-integrity bugs found in a three-critic whole-codebase
+review, fixed with regression tests:
+
+- **ESF-017 — 6-digit sheep ids.** `_FLAM3_RE` matched exactly `\d{5}`, so any
+  sheep id ≥ 100,000 was silently dropped by `import`, `index`,
+  `migrate-chunked`, `release-build`, and `verify-unseal`. The pattern is now
+  `\d{5,}` and lives once as `FLAM3_RE` in `layout.py` — the five former copies
+  each kept their own, which is exactly how a width contract drifts.
+- **ESF-018 — corpus poisoning via non-flam3 200s.** `fetch` wrote any HTTP 200
+  body verbatim, so the archive's `none\n` placeholder or an HTML error page
+  became a bogus `.flam3` that then marked the id skip-local forever. The write
+  is now gated on `is_flam3_content()`; a non-flam3 200 is a transient error
+  (no write, no missing-entry).
+
+Remaining review findings tracked as ESF-019..037 in [BACKLOG](BACKLOG.md).
+
 ### Phase 12f — delivery-chunk artifact + `sheep-fold chunk` CLI
 
 New `corpus-chunks-{date}.tar` Release asset and standalone
