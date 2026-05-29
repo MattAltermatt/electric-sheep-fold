@@ -237,7 +237,16 @@ lightweight `CONTRIBUTING.md` is the highest-value one.
 float unmonitored. **Fix:** add a Dependabot config; CodeQL is lower priority for
 a small pure-Python CLI but cheap to add.
 
-## [ESF-036] infra · XS · 🔧 · open — branch-protection ruleset on `main`
+## [ESF-036] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — branch-protection ruleset on `main`
+
+> **✅ Resolved 2026-05-29.** `main` branch protection requires the 4 CI checks
+> (`ruff + mypy`, `pytest (py3.11/3.12/3.13)`), `strict` (up-to-date) on.
+> **`enforce_admins: false`** by deliberate choice — the gate applies to PRs /
+> future contributors while the solo maintainer keeps the direct-FF-push-to-main
+> convention. **Caveat:** the required contexts are matrix-coupled — changing the
+> Python matrix in `ci.yml` means updating the required-checks list (or switch to
+> a single aggregator `ci-ok` job; filed as a future hardening).
+
 
 `main` is unprotected (`protected: false`, 0 rulesets); the documented
 FF-merge-after-verify workflow is not enforced. **Fix (after ESF-030):** ruleset
