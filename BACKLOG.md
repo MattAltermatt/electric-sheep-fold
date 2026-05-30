@@ -115,7 +115,13 @@ single-flame file (`<flame>…</flame>GARBAGE`) is counted as a 1-frame animatio
 rather than `corrupt`. **Fix:** only treat as animation when byte-counting finds
 ≥ 2 `<flame` occurrences; otherwise `corrupt`.
 
-## [ESF-023] bug · S · 🐛 · open — unseal move can clobber a newer corpus file on resume
+## [ESF-023] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `b274669`)** — unseal move can clobber a newer corpus file on resume
+
+> **✅ Resolved 2026-05-29.** `_move_flam3s_into_gen_dir` now skips the move when
+> `dest` exists (same id ⇒ same content under ES append-only immutability; dest
+> may be a newer concurrent-fetch write) — discards the redundant extracted copy
+> instead of clobbering. Test `test_unseal.py::TestMoveFlam3sNoClobber`.
+
 
 `unseal.py:292-296` does `os.replace(src, dest)` unconditionally; if a parallel
 `fetch` wrote a newer corpus file for the same id between steps, the unsealed
@@ -123,7 +129,13 @@ rather than `corrupt`. **Fix:** only treat as animation when byte-counting finds
 replacing (skip-or-verify-identical), matching the docstring's stated
 idempotency contract.
 
-## [ESF-024] bug · S · 🐛 · open — index can emit duplicate ids in hybrid sealed+loose state
+## [ESF-024] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `d3d6a1e`)** — index can emit duplicate ids in hybrid sealed+loose state
+
+> **✅ Resolved 2026-05-29.** `iter_corpus_flames` dedups per gen with a `seen`
+> set, walking loose (v0.4-native) files first so they win over any leftover
+> sealed-zip transit copy of the same id. Test
+> `test_index.py::…::test_hybrid_sealed_plus_loose_yields_once_loose_wins`.
+
 
 `index.iter_corpus_flames` (`index.py:330-359`) `rglob`s loose files AND reads
 sealed-zip members; an id present in both (a real transit state) is emitted
