@@ -109,8 +109,12 @@ q11-brotli `corpus-chunks` pass that produced byte-identical data to 2026-05-28.
 Actions — the corpus is gitignored + ~554 MB, the same wall that deferred
 [ESF-033]. **Filename subtlety:** reuse the prior-dated asset for unchanged gens
 (a 2026-05-29 release honestly containing `gen-244-2026-05-23.zip`) rather than
-re-stamping. Related: [ESF-007] (incremental index rebuild), [ESF-008] (release
-memory).
+re-stamping. **Housekeeping:** pair with a `--prune-old` step that deletes
+superseded dated artifacts from `build/release/` after a successful build — they
+are regenerable and canonically stored in GH Releases, yet ~1 GB accumulates per
+stale release era (the 2026-05-29 build left 954 MB of 2026-05-23/-28 artifacts
+behind, cleaned by hand). Related: [ESF-007] (incremental index rebuild),
+[ESF-008] (release memory).
 
 ## [ESF-009] feature · S · 🔧 · open — id-set diff for consistency checks
 
