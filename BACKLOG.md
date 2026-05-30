@@ -62,10 +62,6 @@ every later index field cheap to backfill.
 Faster than scanning the 60+ MB `index.json` for repeat lookups. Build on demand
 from `index.json`; `index.json` stays canonical.
 
-## [ESF-006] feature · S · 🐑 · open — palette-hash field
-
-Group genomes by visually-equivalent palettes for de-duped browsing.
-
 ## [ESF-005] feature · S · 🐑 · open — curated examples file
 
 Hand-picked pyr3-parity references + stress-test cases (a `curated.md` analog).
@@ -153,6 +149,21 @@ download" README snippet over those digests.
 Not publishing to PyPI (a legitimate choice for corpus tooling). If that changes:
 fill `classifiers` / `keywords` / `[project.urls]` and publish via OIDC trusted
 publishing (not a long-lived token).
+
+## [ESF-006] feature · S · 🐑 · 🚫 WON'T DO — palette-hash field for de-duped browsing
+
+Field in search of a consumer. A 3-agent investigation (2026-05-29) confirmed it
+would *work* — exact-normalized hashing collapses 65–95% of genomes into shared
+color-scheme buckets (ES copies parent palettes verbatim far more than it mutates
+them; the genetic-drift hypothesis was wrong, and perceptual/quantized hashing
+adds <1pp before it fuses visibly-distinct palettes). But nothing consumes it:
+pyr3 parses palettes straight from raw `.flam3`, no `jq` recipe groups by palette,
+and the only plausible consumer (browsable gallery [ESF-016]) is itself deferred +
+blocked on pyr3 PNG rendering. Revisit only if a gallery materializes — and if so,
+note the two findings worth preserving: (1) the corpus has **two** palette
+encodings (inline `<color>` RGB in gens 198/242–248 vs `palette="N"` integer refs
+in the four oldest gens — the latter needs a separate `palette_ref` field, ~637
+distinct, 95% dedup), and (2) ship **exact** (`sha256[:16]`), not perceptual.
 
 ## [ESF-034] infra · S · 🚫 WON'T DO — community-health files (CoC / CONTRIBUTING / templates)
 
