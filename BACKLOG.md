@@ -8,7 +8,7 @@ narrative + current phase lives in [ROADMAP.md](ROADMAP.md). Pull a ticket
 forward when it becomes load-bearing. When a ticket ships, its entry is **deleted
 here** (CHANGELOG owns the record); `git log -- BACKLOG.md` recovers the trail.
 
-> **Next ID: ESF-038** — increment when creating a new entry. Never reuse, even
+> **Next ID: ESF-039** — increment when creating a new entry. Never reuse, even
 > for shipped/removed tasks.
 
 **Sigils:** 🐛 bug · 🔧 fix/infra · 🔒 security · 🧪 test · 🐑 feature · 🪶 trivial.
@@ -91,6 +91,26 @@ for pyr3 integration.
 ---
 
 ## 📦 Release artifact (defer until corpus growth makes single-machine build painful)
+
+## [ESF-038] feature · M · 🔧 · open — `release-build --skip-unchanged` (fingerprint-gated data artifacts)
+
+Automate the release flow so unchanged corpus data isn't re-compressed. The data
+artifacts (per-gen `.zip`, `corpus-all.tar.xz`, `corpus-chunks.tar`) are pure
+functions of the corpus bytes; only the index also depends on parser/schema code.
+Rule: **always rebuild + ship `index.json` / `INDEX.md` (cheap, ~90s); rebuild a
+data artifact only when its inputs changed.** Cheap fingerprints already exist —
+per-gen `MANIFEST.csv` is `(id, sha256)`, and `corpus/_chunked-verified.json`
+tracks per-gen `loose_count` / `missing_count` / `bucket_count`. Store last-release
+fingerprints in a small state file; `--skip-unchanged` diffs them, reuses the
+prior-dated asset for unchanged gens, and skips `corpus-all` / `chunks` when no
+gen changed. Motivating case: the 2026-05-29 schema-v6 release re-ran a ~20-min
+q11-brotli `corpus-chunks` pass that produced byte-identical data to 2026-05-28.
+**Constraint:** local-only automation (a flag + script/Makefile), NOT GitHub
+Actions — the corpus is gitignored + ~554 MB, the same wall that deferred
+[ESF-033]. **Filename subtlety:** reuse the prior-dated asset for unchanged gens
+(a 2026-05-29 release honestly containing `gen-244-2026-05-23.zip`) rather than
+re-stamping. Related: [ESF-007] (incremental index rebuild), [ESF-008] (release
+memory).
 
 ## [ESF-009] feature · S · 🔧 · open — id-set diff for consistency checks
 
