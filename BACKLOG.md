@@ -152,7 +152,14 @@ Network-sourced `.flam3` is parsed with stdlib `ElementTree` (`extract.py`,
 internal-entity expansion is reachable** → build-host DoS during `index` /
 `release-build`. **Fix:** drop-in `defusedxml.ElementTree`; add it to deps.
 
-## [ESF-027] security · XS · 🔒 · open — document the plaintext-HTTP trust boundary
+## [ESF-027] security · XS · 🔒 · ✅ **RESOLVED (2026-05-29)** — document the plaintext-HTTP trust boundary
+
+> **✅ Resolved 2026-05-29.** Documented in `SECURITY.md` §"Known trust
+> boundaries": the live source is fetched over plaintext `http://v3d0...` (no
+> TLS upstream), so fetched bytes are unauthenticated — accepted on the record,
+> mitigated by defusedxml parsing, never executing content, and rejecting
+> non-flam3 200s.
+
 
 The live server is fetched over `http://v3d0.sheepserver.net` (`layout.py:6`);
 the 200 body is written with no TLS / hash / signature, so an on-path attacker
@@ -211,7 +218,12 @@ The ~207-test suite runs on faith — nothing executes it on push/PR. **Fix:** a
 them. The quality bar is invisible/unreproducible. **Fix:** add both to the `dev`
 extra, add config blocks, run in CI (depends on ESF-030).
 
-## [ESF-032] infra · XS · 🔒 · open — `SECURITY.md` + private vulnerability reporting
+## [ESF-032] infra · XS · 🔒 · ✅ **RESOLVED (2026-05-29)** — `SECURITY.md` + private vulnerability reporting
+
+> **✅ Resolved 2026-05-29.** Added `SECURITY.md` (supported-versions policy +
+> private reporting channel + trust boundaries) and enabled GitHub Private
+> Vulnerability Reporting on the repo (`{"enabled": true}`).
+
 
 No security policy and no documented reporting channel for a tool that makes
 outbound HTTP requests. **Fix:** add `SECURITY.md` (supported versions +
@@ -225,13 +237,27 @@ with no verification story. **Fix:** tag-triggered workflow running `release-bui
 + `actions/attest-build-provenance` + upload; add a "verify your download" snippet
 (`gh attestation verify` / asset digests) to the README.
 
-## [ESF-034] infra · S · 🐑 · open — community-health files
+## [ESF-034] infra · S · 🐑 · 🚫 **WON'T DO (2026-05-29)** — community-health files
+
+> **🚫 Declined 2026-05-29 (reviewed item-by-item with the user).** CoC,
+> CONTRIBUTING.md, and issue/PR templates were each assessed and cut as ceremony
+> for a solo niche repo: no contributor community to govern; the PR checklist is
+> redundant with the now-enforced CI gate; README + CLAUDE.md already cover dev
+> conventions. Each is a ~2-minute add if a real contributor community ever
+> forms. (SECURITY.md from the same checklist was kept — see ESF-032.)
+
 
 Missing `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue/PR templates. `has_issues`
 is on but there's no triage scaffolding or stated contribution workflow. A
 lightweight `CONTRIBUTING.md` is the highest-value one.
 
-## [ESF-035] infra · XS · 🔧 · open — Dependabot (+ optional CodeQL)
+## [ESF-035] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — Dependabot (+ optional CodeQL)
+
+> **✅ Resolved 2026-05-29.** Added `.github/dependabot.yml` — weekly version +
+> security updates for the `uv` ecosystem (reads pyproject + uv.lock natively,
+> GA Mar 2025) and the SHA-pinned `github-actions`. CodeQL left as optional
+> (low value for a small pure-Python CLI).
+
 
 `dependabot_security_updates` is disabled; no `.github/dependabot.yml`. Deps
 float unmonitored. **Fix:** add a Dependabot config; CodeQL is lower priority for

@@ -8,6 +8,20 @@
 
 ## Pending — next dated release
 
+### Phase 12j — security & supply-chain hygiene (ESF-027, ESF-032, ESF-035)
+
+- **ESF-032 — SECURITY.md + private reporting.** Added a security policy and
+  enabled GitHub Private Vulnerability Reporting, so issues can be disclosed
+  privately instead of in public issues.
+- **ESF-027 — documented trust boundary.** SECURITY.md records the accepted
+  plaintext-HTTP live-source risk (`v3d0` has no TLS) and its mitigations
+  (defusedxml, inert content, non-flam3 rejection).
+- **ESF-035 — Dependabot.** Weekly version + security-update PRs for the `uv`
+  dependency graph and the SHA-pinned GitHub Actions.
+
+Community-health extras (CoC / CONTRIBUTING / templates — ESF-034) were reviewed
+item-by-item and deliberately declined as ceremony for a solo repo.
+
 ### Phase 12i — continuous integration (ESF-030, ESF-031)
 
 First CI for the repo: `.github/workflows/ci.yml` runs on every push to `main`
