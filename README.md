@@ -61,13 +61,15 @@ deploy). Members:
   by design — prevents HTTP hosts from auto-setting `Content-Encoding: br`
   (which would break the renderer's manual brotli decode).
 
-`index.json` is `jq`-queryable (v0.4 envelope:
-`{_schema_version: 4, _build_date, genomes: [...]}` — use `.genomes[]` as
+`index.json` is `jq`-queryable (v5 envelope:
+`{_schema_version: 5, _build_date, genomes: [...]}` — use `.genomes[]` as
 the iterator). `INDEX.md` is human + agent-readable. See
 [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md)
-for query recipes — find flames by variation, pyr3-parity filtering, the
-5 new pyr3 AutoRoute GPU-safety fields (`has_hyper_trig`, `has_edisc`,
-`max_abs_affine_coef`, `xform_count_post_symmetry`, `has_density_estimator`).
+for query recipes — find flames by variation, pyr3-parity filtering, the 5
+pyr3 AutoRoute GPU-safety fields (`has_hyper_trig`, `has_edisc`,
+`max_abs_affine_coef`, `xform_count_post_symmetry`, `has_density_estimator`),
+and the v5 malformation flags (`has_nan_camera` / `has_nan_in_xforms`; plus
+the `has_chaos`→`has_xaos` rename).
 
 ## What's in the corpus
 
