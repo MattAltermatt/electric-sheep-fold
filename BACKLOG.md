@@ -14,6 +14,117 @@ here** (CHANGELOG owns the record); `git log -- BACKLOG.md` recovers the trail.
 **Sigils:** 🐛 bug · 🔧 fix/infra · 🔒 security · 🧪 test · 🐑 feature · 🪶 trivial.
 **Sizes:** XS / S / M / L (cognitive + maintenance complexity, not wall-clock).
 
+> **Ordering:** open sections run in rough priority order (most-likely-next at
+> top), and tickets within a section run cheap-win / foundational first. Parked
+> work (deferred / declined) lives at the bottom.
+
+---
+
+## 🛰️ Live preservation (most-likely-next — routine refresh + new gens)
+
+## [ESF-010] feature · XS · 🐑 · open — gen 249+ live extension
+
+When ES rolls a new live gen: one-line edit to `LIVE_GENS` in `layout.py`, then
+`fetch-all --gen 249`.
+
+## [ESF-011] feature · S · 🐑 · open — range-discovery from server index HTML
+
+Instead of `--upper 50000`, parse `/gen/N/` HTML once to determine the true upper
+bound and auto-extend.
+
+## [ESF-013] feature · S · 🐑 · open — server-index cache
+
+Save the `/gen/NNN/` index HTML (~6 MB for gen 248) as a one-time preservation
+artifact in case the live server goes dark before a sweep finishes. Shares the
+HTML-fetch with [ESF-011].
+
+## [ESF-012] feature · XS · 🐑 · open — resume-on-SIGTERM banner
+
+Print "Resuming from sheep N" on startup when a partial run is detected.
+
+## [ESF-014] feature · XS · 🐑 · open — `--retry-missing` flag
+
+Only if ES ever shifts numbering semantics. Not needed under the current "gaps
+stay gaps" invariant.
+
+---
+
+## 🔍 Index query ergonomics (pull forward when `index.json` scans slow / pyr3 demands)
+
+## [ESF-007] feature · S · 🐑 · open — incremental index rebuild
+
+Rebuild only gens whose `_chunked-verified.json` `loose_count` changed since last
+index — chunked layout makes this trivial (per-bucket mtime). Foundational: makes
+every later index field cheap to backfill.
+
+## [ESF-004] feature · M · 🐑 · open — SQLite-backed query interface
+
+Faster than scanning the 60+ MB `index.json` for repeat lookups. Build on demand
+from `index.json`; `index.json` stays canonical.
+
+## [ESF-006] feature · S · 🐑 · open — palette-hash field
+
+Group genomes by visually-equivalent palettes for de-duped browsing.
+
+## [ESF-005] feature · S · 🐑 · open — curated examples file
+
+Hand-picked pyr3-parity references + stress-test cases (a `curated.md` analog).
+
+---
+
+## 📚 Index richness (future schema bump — cheap fields first)
+
+## [ESF-003] feature · XS · 🐑 · open — provenance field (`version`)
+
+The flam3 root carries `version` (the renderer that produced the genome). Useful
+for archival forensics and pyr3 version-targeting.
+
+## [ESF-002] feature · S · 🐑 · open — tone-mapping diversity fields
+
+Surface `gamma`, `vibrancy`, `estimator_minimum`, `estimator_curve` — the rest of
+the density-estimator + tone-map family. Currently only `has_density_estimator`
+is exposed.
+
+## [ESF-001] feature · M · 🐑 · open — runtime NaN detection (`produces_nan: bool`)
+
+Static checks (the v0.4 five-field set) catch most NaN producers; a short
+chaos-game probe per genome would catch residuals. Index-build cost scales
+linearly; gate on whether the static-only verdict misses enough cases to matter
+for pyr3 integration.
+
+---
+
+## 📦 Release artifact (defer until corpus growth makes single-machine build painful)
+
+## [ESF-009] feature · S · 🔧 · open — id-set diff for consistency checks
+
+`verify_unseal_consistency` and `verify_chunked_consistency` catch deletions via
+count shrinkage, but a `missing.txt` overwrite that ADDS bogus entries while
+losing real ones could net to the same total and slip through. A stronger id-set
+diff against the post-migrate baseline closes the gap. Related: the hybrid-dedup
+fix (ESF-024, shipped phase 12g).
+
+## [ESF-008] feature · M · 🔧 · open — stream `.flam3` bytes in `release._gather_gen_data`
+
+Currently loads every flam3 into memory at once → peak RAM ~1.3 GB for gen 244
+(86k files × ~15 KB). Fix: pass file paths through to `zipfile.write(path,
+arcname=…)` for loose-mode gens; keep the in-memory dict for the sealed-transit
+fallback. Defer until corpus growth makes single-machine release-build painful.
+
+---
+
+## 🎨 Consumer-facing (downstream of pyr3 integration)
+
+## [ESF-015] feature · XS · 🐑 · open — sidecar files
+
+`--include-sidecars` flag if pyr3 ever needs `state.fsd` / `memory` / `spex`
+alongside the `.flam3`.
+
+## [ESF-016] feature · M · 🐑 · open — browsable gallery
+
+GitHub Pages thumbnail grid — downstream of pyr3 integration (needs pyr3 rendering
+to PNGs first).
+
 ---
 
 ## ⏸ Deferred / declined (2026-05-29 code review)
@@ -50,100 +161,3 @@ community to govern; the PR checklist is redundant with the enforced CI gate;
 README + CLAUDE.md already cover dev conventions. A ~2-minute add if a real
 contributor community ever forms. (SECURITY.md from the same checklist shipped —
 phase 12j.)
-
----
-
-## 📚 Index richness (post-v0.4 — future schema bump)
-
-## [ESF-001] feature · M · 🐑 · open — runtime NaN detection (`produces_nan: bool`)
-
-Static checks (the v0.4 five-field set) catch most NaN producers; a short
-chaos-game probe per genome would catch residuals. Index-build cost scales
-linearly; gate on whether the static-only verdict misses enough cases to matter
-for pyr3 integration.
-
-## [ESF-002] feature · S · 🐑 · open — tone-mapping diversity fields
-
-Surface `gamma`, `vibrancy`, `estimator_minimum`, `estimator_curve` — the rest of
-the density-estimator + tone-map family. Currently only `has_density_estimator`
-is exposed.
-
-## [ESF-003] feature · XS · 🐑 · open — provenance field (`version`)
-
-The flam3 root carries `version` (the renderer that produced the genome). Useful
-for archival forensics and pyr3 version-targeting.
-
-## 🔍 Index query ergonomics (Phase 12c candidate)
-
-## [ESF-004] feature · M · 🐑 · open — SQLite-backed query interface
-
-Faster than scanning the 60+ MB `index.json` for repeat lookups. Build on demand
-from `index.json`; `index.json` stays canonical.
-
-## [ESF-005] feature · S · 🐑 · open — curated examples file
-
-Hand-picked pyr3-parity references + stress-test cases (a `curated.md` analog).
-
-## [ESF-006] feature · S · 🐑 · open — palette-hash field
-
-Group genomes by visually-equivalent palettes for de-duped browsing.
-
-## [ESF-007] feature · S · 🐑 · open — incremental index rebuild
-
-Rebuild only gens whose `_chunked-verified.json` `loose_count` changed since last
-index — chunked layout makes this trivial (per-bucket mtime).
-
-## 📦 Release artifact
-
-## [ESF-008] feature · M · 🔧 · open — stream `.flam3` bytes in `release._gather_gen_data`
-
-Currently loads every flam3 into memory at once → peak RAM ~1.3 GB for gen 244
-(86k files × ~15 KB). Fix: pass file paths through to `zipfile.write(path,
-arcname=…)` for loose-mode gens; keep the in-memory dict for the sealed-transit
-fallback. Defer until corpus growth makes single-machine release-build painful.
-
-## [ESF-009] feature · S · 🔧 · open — id-set diff for consistency checks
-
-`verify_unseal_consistency` and `verify_chunked_consistency` catch deletions via
-count shrinkage, but a `missing.txt` overwrite that ADDS bogus entries while
-losing real ones could net to the same total and slip through. A stronger id-set
-diff against the post-migrate baseline closes the gap. Related: the hybrid-dedup
-fix (ESF-024, shipped phase 12g).
-
-## 🛰️ Live preservation
-
-## [ESF-010] feature · XS · 🐑 · open — gen 249+ live extension
-
-When ES rolls a new live gen: one-line edit to `LIVE_GENS` in `layout.py`, then
-`fetch-all --gen 249`.
-
-## [ESF-011] feature · S · 🐑 · open — range-discovery from server index HTML
-
-Instead of `--upper 50000`, parse `/gen/N/` HTML once to determine the true upper
-bound and auto-extend.
-
-## [ESF-012] feature · XS · 🐑 · open — resume-on-SIGTERM banner
-
-Print "Resuming from sheep N" on startup when a partial run is detected.
-
-## [ESF-013] feature · S · 🐑 · open — server-index cache
-
-Save the `/gen/NNN/` index HTML (~6 MB for gen 248) as a one-time preservation
-artifact in case the live server goes dark before a sweep finishes.
-
-## [ESF-014] feature · XS · 🐑 · open — `--retry-missing` flag
-
-Only if ES ever shifts numbering semantics. Not needed under the current "gaps
-stay gaps" invariant.
-
-## 🎨 Consumer-facing
-
-## [ESF-015] feature · XS · 🐑 · open — sidecar files
-
-`--include-sidecars` flag if pyr3 ever needs `state.fsd` / `memory` / `spex`
-alongside the `.flam3`.
-
-## [ESF-016] feature · M · 🐑 · open — browsable gallery
-
-GitHub Pages thumbnail grid — downstream of pyr3 integration (needs pyr3 rendering
-to PNGs first).
