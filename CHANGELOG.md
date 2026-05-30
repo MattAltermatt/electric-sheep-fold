@@ -8,6 +8,25 @@
 
 ## Pending — next dated release
 
+### Phase 12l — genome-only chunk delivery (ESF-039)
+
+`sheep-fold chunk --genome-only` (and `build_chunks_tar(index_path=…)`) bakes a
+`corpus-chunks-genome-{date}.tar` containing only canonical single-flame
+**genomes** — the 114k animation morph-frames are dropped, since pyr3 renders
+single stills and an animation is just a derivative interpolation between genome
+keyframes. Classification comes from `_index/index.json` (the source of truth).
+
+**Orphan-keyframe promotion:** 81 morph keyframes (80× gen 244, 1× gen 247) are
+referenced only inside animations and were never extracted to a standalone
+genome (their id is an empty gap). Each is promoted to a genome at its own sheep
+id — verified byte-identical across its two containing morphs. Served set:
+52,284 genomes + 81 = **52,365**, zero animations, zero collisions.
+
+`gens.json` schema → **v2** with a `kind` field (`"genome"` | `"all"`), so a
+genome-only artifact is self-describing and the absence of animation chunks is
+an explicit, queryable state for whenever animation delivery is built. Driven by
+pyr3 (the sole downstream consumer); cross-ref **pyr3 #39**.
+
 ### Phase 12k — index schema v6: provenance + tone-map richness (ESF-002, ESF-003)
 
 Bumped `index.json` to `_schema_version: 6` with five new per-genome fields:

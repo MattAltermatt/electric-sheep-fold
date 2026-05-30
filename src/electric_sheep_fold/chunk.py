@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 import tarfile
 from collections import defaultdict
 from pathlib import Path
@@ -39,8 +40,18 @@ CHUNK_FORMAT_VERSION = 1
 _BROTLI_QUALITY = 11
 
 # Schema version for gens.json; bumped when the shape changes (independent of
-# CHUNK_FORMAT_VERSION and the /v1 URL grammar).
-GENS_JSON_SCHEMA = 1
+# CHUNK_FORMAT_VERSION and the /v1 URL grammar). v2 (ESF-039): added the `kind`
+# field ("genome" | "all") marking whether the bake dropped animation frames.
+GENS_JSON_SCHEMA = 2
+
+# ESF-039 — extract a single <flame> element verbatim from a multi-flame
+# animation file, read its name, and pull the sheep id off the name suffix.
+# flam3 files are flat (no nested <flame>), so a non-greedy element match is
+# safe. Byte-faithful: we keep the original element text (incl. time=) so the
+# promoted keyframe is exactly what the morph encoded.
+_FLAME_ELEMENT_RE = re.compile(r"<flame\b.*?</flame>", re.DOTALL)
+_FLAME_NAME_RE = re.compile(r'<flame\b[^>]*\bname="([^"]*)"')
+_NAME_ID_SUFFIX_RE = re.compile(r"\.(\d+)$")
 
 
 def chunk_lo(sheep_id: int) -> int:
@@ -143,7 +154,9 @@ def decode_avail(raw: bytes) -> list[int]:
     return ids
 
 
-def build_gens_json(per_gen: dict[int, list[int]], build_date: str) -> dict:
+def build_gens_json(
+    per_gen: dict[int, list[int]], build_date: str, kind: str = "all"
+) -> dict:
     """Build the gens.json browse summary dict (caller serializes to JSON).
 
     Returns:
@@ -151,11 +164,18 @@ def build_gens_json(per_gen: dict[int, list[int]], build_date: str) -> dict:
             "schema": GENS_JSON_SCHEMA,
             "build_date": build_date,
             "chunk_size": CHUNK_SIZE,
+            "kind": "genome" | "all",   # ESF-039
             "gens": [
                 {"gen": g, "count": N, "min_id": lo, "max_id": hi},
                 ...  # sorted ascending by gen
             ]
         }
+
+    `kind` marks what the bake contains: "genome" = canonical single-flame
+    genomes only (animation morph-frames dropped); "all" = every file. This
+    makes a genome-only artifact self-describing, so the absence of animation
+    chunks is an explicit, queryable state — not a silent gap — for whenever
+    animation delivery is built (its own future epic).
 
     Assumes each gen's id list is non-empty; gens with zero ids should not
     be passed in. The returned dict is plain Python — ship it as-is with
@@ -166,6 +186,7 @@ def build_gens_json(per_gen: dict[int, list[int]], build_date: str) -> dict:
         "schema": GENS_JSON_SCHEMA,
         "build_date": build_date,
         "chunk_size": CHUNK_SIZE,
+        "kind": kind,
         "gens": [
             {
                 "gen": g,
@@ -178,7 +199,62 @@ def build_gens_json(per_gen: dict[int, list[int]], build_date: str) -> dict:
     }
 
 
-def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
+def load_classification(
+    index_path: Path,
+) -> tuple[dict[int, set[int]], dict[int, set[int]]]:
+    """Read `index.json` → (genome_ids, animation_ids), each gen -> set of ids.
+
+    The index (`sheep-fold index`) is the source of truth for the
+    genome/animation/corrupt classification — its logic is nuanced (corrupt
+    detection, junk-after-document, ESF-022), so the chunk bake reads it rather
+    than re-deriving. Records with any other `kind` (corrupt) are excluded from
+    both sets and thus never baked.
+    """
+    data = json.loads(index_path.read_text(encoding="utf-8"))
+    genome_ids: dict[int, set[int]] = defaultdict(set)
+    animation_ids: dict[int, set[int]] = defaultdict(set)
+    for rec in data.get("genomes", []):
+        kind = rec.get("kind")
+        if kind == "genome":
+            genome_ids[rec["gen"]].add(rec["sheep_id"])
+        elif kind == "animation":
+            animation_ids[rec["gen"]].add(rec["sheep_id"])
+    return genome_ids, animation_ids
+
+
+def extract_orphan_keyframes(
+    animation_xml: str, genome_ids: set[int]
+) -> dict[int, str]:
+    """Return {sheep_id: <flame> xml} for keyframes in `animation_xml` whose id
+    is NOT already a standalone genome.
+
+    Some morph keyframes are referenced only inside animation files and were
+    never extracted to a standalone genome (their id is an empty gap). Promoting
+    them keeps those canonical flames reachable under a genome-only bake. The
+    shared junction keyframe between two consecutive morphs is byte-identical in
+    both, so de-duplication (last write wins) is safe.
+    """
+    out: dict[int, str] = {}
+    for flame_xml in _FLAME_ELEMENT_RE.findall(animation_xml):
+        name_match = _FLAME_NAME_RE.search(flame_xml)
+        if name_match is None:
+            continue
+        id_match = _NAME_ID_SUFFIX_RE.search(name_match.group(1))
+        if id_match is None:
+            continue
+        kf_id = int(id_match.group(1))
+        if kf_id not in genome_ids:
+            out[kf_id] = flame_xml
+    return out
+
+
+def build_chunks_tar(
+    corpus_root: Path,
+    out_tar: Path,
+    build_date: str,
+    *,
+    index_path: Path | None = None,
+) -> None:
     """Assemble a corpus-chunks-{date}.tar delivery artifact from a corpus tree.
 
     Walks `corpus_root` for `.flam3` files matching the canonical filename
@@ -190,11 +266,23 @@ def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
     - `{gen}/{chunk_lo:05d}.flam3chunk` per non-empty window — brotli'd JSON
       map of present {id: xml} pairs within that window.
 
+    When `index_path` is given, the bake is **genome-only** (ESF-039): only
+    `kind == "genome"` ids are included; animation files are dropped, but their
+    orphan keyframes (ids absent from the genome set) are promoted to standalone
+    genomes at their own id; corrupt files are excluded. `gens.json.kind` is set
+    to "genome" so the artifact is self-describing. Without `index_path` the
+    bake includes every file and marks `kind` "all" (the legacy behavior).
+
     Members are written in sorted name order for a reproducible artifact.
     mtime is set to 0 on all TarInfo entries to avoid wall-clock leakage.
     Creates `out_tar`'s parent directory if it does not exist.
     """
-    # --- collect all flames from the corpus tree ----------------------------
+    genome_only = index_path is not None
+    genome_ids, animation_ids = (
+        load_classification(index_path) if index_path is not None else ({}, {})
+    )
+
+    # --- collect flames from the corpus tree --------------------------------
     # per_gen: gen -> {id: xml_text}
     per_gen: dict[int, dict[int, str]] = defaultdict(dict)
 
@@ -209,7 +297,7 @@ def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
         except ValueError:
             continue
         try:
-            per_gen[gen][sid] = path.read_text(encoding="utf-8")
+            xml = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             # A corrupt, non-UTF-8 .flam3 (flam3 XML is always UTF-8). Skip it
             # rather than abort the whole artifact — and skip it entirely so it
@@ -221,6 +309,23 @@ def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
                 path,
             )
             continue
+
+        if not genome_only:
+            per_gen[gen][sid] = xml
+            continue
+
+        # genome-only mode (ESF-039)
+        gset = genome_ids.get(gen, set())
+        if sid in gset:
+            per_gen[gen][sid] = xml
+        elif sid in animation_ids.get(gen, set()):
+            # Drop the animation file; promote any keyframe whose id isn't a
+            # genome to a standalone genome at its own id. setdefault de-dups
+            # the shared junction keyframe; a real genome file (processed in any
+            # order) overwrites via the `sid in gset` branch above, so it wins.
+            for kf_id, flame_xml in extract_orphan_keyframes(xml, gset).items():
+                per_gen[gen].setdefault(kf_id, flame_xml)
+        # else: corrupt / unclassified -> excluded
 
     if not per_gen:
         # Most likely a pre-v0.4 flat corpus (files at {gen}/...flam3, one
@@ -240,7 +345,8 @@ def build_chunks_tar(corpus_root: Path, out_tar: Path, build_date: str) -> None:
     # gens.json — plain JSON, not brotli
     per_gen_ids: dict[int, list[int]] = {g: sorted(ids) for g, ids in per_gen.items()}
     gens_json_bytes = json.dumps(
-        build_gens_json(per_gen_ids, build_date), ensure_ascii=False
+        build_gens_json(per_gen_ids, build_date, kind="genome" if genome_only else "all"),
+        ensure_ascii=False,
     ).encode("utf-8")
     members.append(("gens.json", gens_json_bytes))
 

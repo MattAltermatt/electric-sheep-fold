@@ -106,8 +106,9 @@ def test_avail_deduplicates_and_sorts_input():
 
 def test_gens_json_shape():
     out = build_gens_json({247: [0, 5, 41234], 248: [10]}, build_date="2026-05-28")
-    assert out["schema"] == 1 and out["chunk_size"] == 256
+    assert out["schema"] == 2 and out["chunk_size"] == 256
     assert out["build_date"] == "2026-05-28"
+    assert out["kind"] == "all"  # ESF-039: default when no kind passed
     assert out["gens"][0] == {"gen": 247, "count": 3, "min_id": 0, "max_id": 41234}
     assert out["gens"][1]["gen"] == 248
 
@@ -167,7 +168,7 @@ def test_build_chunks_tar_gens_json_plain(tmp_path):
     with tarfile.open(out) as t:
         raw = t.extractfile("gens.json").read()
         obj = json.loads(raw)  # plain JSON — no brotli
-    assert obj["schema"] == 1
+    assert obj["schema"] == 2
     assert obj["build_date"] == "2026-05-28"
     assert obj["chunk_size"] == 256
     assert len(obj["gens"]) == 1
@@ -253,3 +254,116 @@ def test_build_chunks_tar_is_reproducible_mtime_zero(tmp_path):
     with tarfile.open(out) as t:
         for member in t.getmembers():
             assert member.mtime == 0, f"{member.name} has non-zero mtime"
+
+
+# ---------------------------------------------------------------------------
+# ESF-039 — genome-only bake (index-filtered + orphan-keyframe promotion)
+# ---------------------------------------------------------------------------
+
+
+def _write_index(corpus: Path, records: list[tuple[int, int, str]]) -> Path:
+    """Write a minimal corpus/_index/index.json. records = [(gen, sheep_id, kind)]."""
+    idx_dir = corpus / "_index"
+    idx_dir.mkdir(parents=True, exist_ok=True)
+    idx = idx_dir / "index.json"
+    idx.write_text(
+        json.dumps(
+            {
+                "_schema_version": 6,
+                "_build_date": "2026-05-29",
+                "genomes": [
+                    {"gen": g, "sheep_id": s, "kind": k} for g, s, k in records
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return idx
+
+
+def test_genome_only_excludes_animation_ids(tmp_path):
+    """index_path → animation file ids are dropped; genome ids kept."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, '<flame name="electricsheep.247.5">g</flame>')
+    _write_flam3(
+        corpus, 247, 6,
+        '<flame name="electricsheep.247.5" time="0">a0</flame>'
+        '<flame name="electricsheep.247.5" time="160">a1</flame>',
+    )
+    idx = _write_index(corpus, [(247, 5, "genome"), (247, 6, "animation")])
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-29", index_path=idx)
+    with tarfile.open(out) as t:
+        avail = decode_avail(t.extractfile("247/avail.flam3idx").read())
+    assert 5 in avail
+    assert 6 not in avail  # animation file id dropped
+
+
+def test_genome_only_promotes_orphan_keyframe(tmp_path):
+    """A keyframe id referenced by an animation but absent from genomes is
+    promoted to a standalone genome at its own id, with its <flame> body."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, '<flame name="electricsheep.247.5">g</flame>')
+    _write_flam3(
+        corpus, 247, 6,
+        '<flame name="electricsheep.247.5" time="0">a0</flame>'
+        '<flame name="electricsheep.247.99" time="160">ORPHAN</flame>',
+    )
+    idx = _write_index(corpus, [(247, 5, "genome"), (247, 6, "animation")])
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-29", index_path=idx)
+    with tarfile.open(out) as t:
+        avail = decode_avail(t.extractfile("247/avail.flam3idx").read())
+        chunk = json.loads(brotli.decompress(t.extractfile("247/00000.flam3chunk").read()))
+    assert 99 in avail
+    assert "ORPHAN" in chunk["99"]  # the orphan keyframe's <flame> is served at id 99
+
+
+def test_genome_only_dedups_shared_orphan(tmp_path):
+    """An orphan keyframe shared by two animations is promoted exactly once."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, '<flame name="electricsheep.247.5">g</flame>')
+    _write_flam3(
+        corpus, 247, 6,
+        '<flame name="electricsheep.247.99" time="0">SHARED</flame>'
+        '<flame name="electricsheep.247.5" time="160">x</flame>',
+    )
+    _write_flam3(
+        corpus, 247, 7,
+        '<flame name="electricsheep.247.5" time="0">y</flame>'
+        '<flame name="electricsheep.247.99" time="160">SHARED</flame>',
+    )
+    idx = _write_index(
+        corpus, [(247, 5, "genome"), (247, 6, "animation"), (247, 7, "animation")]
+    )
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-29", index_path=idx)
+    with tarfile.open(out) as t:
+        avail = decode_avail(t.extractfile("247/avail.flam3idx").read())
+    assert sorted(avail) == [5, 99]  # 6,7 dropped; 99 promoted once
+
+
+def test_genome_only_marks_gens_json_kind(tmp_path):
+    """gens.json carries kind:'genome' so missing animation chunks are explicit."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, '<flame name="electricsheep.247.5">g</flame>')
+    idx = _write_index(corpus, [(247, 5, "genome")])
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-29", index_path=idx)
+    with tarfile.open(out) as t:
+        gens = json.loads(t.extractfile("gens.json").read())
+    assert gens["kind"] == "genome"
+
+
+def test_all_files_mode_marks_kind_all_and_keeps_animations(tmp_path):
+    """No index_path → unchanged all-files behavior, kind:'all'."""
+    corpus = tmp_path / "corpus"
+    _write_flam3(corpus, 247, 5, '<flame name="electricsheep.247.5">g</flame>')
+    _write_flam3(corpus, 247, 6, '<flame>a0</flame><flame>a1</flame>')
+    out = tmp_path / "out.tar"
+    build_chunks_tar(corpus, out, build_date="2026-05-29")
+    with tarfile.open(out) as t:
+        avail = decode_avail(t.extractfile("247/avail.flam3idx").read())
+        gens = json.loads(t.extractfile("gens.json").read())
+    assert sorted(avail) == [5, 6]  # both kept (all-files)
+    assert gens["kind"] == "all"

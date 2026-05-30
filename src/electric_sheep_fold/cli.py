@@ -379,12 +379,23 @@ def chunk(
         "--date",
         help="Build date stamped into artifact filename (YYYY-MM-DD). Defaults to today UTC.",
     ),
+    genome_only: bool = typer.Option(
+        False,
+        "--genome-only",
+        help="Bake only kind=='genome' flames (drop animation morph-frames; "
+        "promote orphan keyframes to their own id). Reads {corpus}/_index/index.json; "
+        "names the artifact corpus-chunks-genome-{date}.tar (ESF-039).",
+    ),
 ) -> None:
     """Build corpus-chunks-{date}.tar delivery artifact (standalone/debug).
 
     Walks the v0.4 chunked corpus; emits brotli'd 256-id delivery windows
     + per-gen availability manifests + gens.json browse summary.
     Use ``release-build`` to include this artifact in a full release.
+
+    ``--genome-only`` produces ``corpus-chunks-genome-{date}.tar`` containing
+    only canonical single-flame genomes (+ promoted orphan keyframes), with
+    ``gens.json.kind == "genome"`` — for pyr3's single-still corpus viewer.
     """
     from datetime import date as _date
     from datetime import datetime as _dt
@@ -404,8 +415,18 @@ def chunk(
         build_date = _dt.now(tz=_tz.utc).date()
 
     out.mkdir(parents=True, exist_ok=True)
-    dest = out / f"corpus-chunks-{build_date.isoformat()}.tar"
-    build_chunks_tar(corpus, dest, build_date.isoformat())
+    if genome_only:
+        index_path = corpus / "_index" / "index.json"
+        if not index_path.exists():
+            raise typer.BadParameter(
+                f"--genome-only needs the corpus index: {index_path} not found. "
+                f"Run `sheep-fold index` first."
+            )
+        dest = out / f"corpus-chunks-genome-{build_date.isoformat()}.tar"
+        build_chunks_tar(corpus, dest, build_date.isoformat(), index_path=index_path)
+    else:
+        dest = out / f"corpus-chunks-{build_date.isoformat()}.tar"
+        build_chunks_tar(corpus, dest, build_date.isoformat())
     typer.echo(f"\nwrote {dest}")
 
 

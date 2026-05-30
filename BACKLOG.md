@@ -8,7 +8,7 @@ narrative + current phase lives in [ROADMAP.md](ROADMAP.md). Pull a ticket
 forward when it becomes load-bearing. When a ticket ships, its entry is **deleted
 here** (CHANGELOG owns the record); `git log -- BACKLOG.md` recovers the trail.
 
-> **Next ID: ESF-039** — increment when creating a new entry. Never reuse, even
+> **Next ID: ESF-040** — increment when creating a new entry. Never reuse, even
 > for shipped/removed tasks.
 
 **Sigils:** 🐛 bug · 🔧 fix/infra · 🔒 security · 🧪 test · 🐑 feature · 🪶 trivial.

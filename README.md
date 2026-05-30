@@ -114,7 +114,7 @@ sheep-fold --help
 | `sheep-fold index` | Rebuild `corpus/_index/{index.json, INDEX.md}` (agent-queryable) |
 | `sheep-fold status` | Show per-gen file + missing counts |
 | `sheep-fold release-build [--date YYYY-MM-DD]` | Build `build/release/gen-{N}-{date}.zip` + `corpus-all-{date}.tar.xz` + `corpus-chunks-{date}.tar` from corpus state |
-| `sheep-fold chunk [--date YYYY-MM-DD]` | Build `build/release/corpus-chunks-{date}.tar` standalone (also emitted by `release-build`) |
+| `sheep-fold chunk [--date YYYY-MM-DD] [--genome-only]` | Build `build/release/corpus-chunks-{date}.tar` standalone (also emitted by `release-build`). `--genome-only` reads `_index/index.json` and bakes `corpus-chunks-genome-{date}.tar` — canonical genomes only (animation morph-frames dropped, orphan keyframes promoted; `gens.json.kind == "genome"`) for pyr3's single-still viewer |
 | `sheep-fold migrate-chunked` / `verify-chunked` | v0.4 chunked-layout migration (idempotent) + consistency guard |
 | `sheep-fold unseal` / `verify-unseal` | Historical v0.2 → v0.3 sealed-zip unwind (one-shot; preserved for archival re-runs) |
 | `./scripts/build_release.sh` | Thin wrapper around `sheep-fold release-build` for the next GH Release |
