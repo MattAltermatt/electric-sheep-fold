@@ -55,4 +55,6 @@ no continuous-daemon expectation.
   (`migrate-chunked` is a no-op on an already-chunked corpus.)
 - 🔮 **New dead gen?** recover the scrapers via `git show v0.3.0:scripts/scrape_archive_gen.py`
   etc. — see [`docs/operations.md`](docs/operations.md) §"Preserve a new dead generation".
-- 📈 **Index ergonomics** ([ESF-004–007]) when `index.json` scans get slow.
+- 📈 **Index rebuild speed** ([ESF-007]) only if the corpus grows enough that the
+  ~90s full rebuild becomes painful. (The rest of "index ergonomics" was resolved
+  2026-05-29 — see above.)
