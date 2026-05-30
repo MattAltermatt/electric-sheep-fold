@@ -59,18 +59,10 @@ every later index field cheap to backfill.
 
 ---
 
-## 📚 Index richness (future schema bump — cheap fields first)
+## 📚 Index richness (future schema bump)
 
-## [ESF-003] feature · XS · 🐑 · open — provenance field (`version`)
-
-The flam3 root carries `version` (the renderer that produced the genome). Useful
-for archival forensics and pyr3 version-targeting.
-
-## [ESF-002] feature · S · 🐑 · open — tone-mapping diversity fields
-
-Surface `gamma`, `vibrancy`, `estimator_minimum`, `estimator_curve` — the rest of
-the density-estimator + tone-map family. Currently only `has_density_estimator`
-is exposed.
+> ESF-002 (tone-map fields) + ESF-003 (`version`) shipped in schema v6
+> (2026-05-29) — see [CHANGELOG](CHANGELOG.md) phase 12k.
 
 ## [ESF-001] feature · M · 🐑 · open — runtime NaN detection (`produces_nan: bool`)
 
