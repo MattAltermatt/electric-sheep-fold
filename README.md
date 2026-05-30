@@ -8,31 +8,31 @@
 
 Each Release is a corpus snapshot in time, tagged with its ISO build
 date (no semver — this is a data archive, not software versioning).
-Latest is **[2026-05-23](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23)**.
+Latest is **[2026-05-29](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-29)**.
 Three consumer paths, all producing the same on-disk tree in the shared
 subset (overlay invariant):
 
 ```sh
 # Path A — bulk, one mega-bundle (LZMA2; ~160 MB)
-gh release download 2026-05-23 -p corpus-all-2026-05-23.tar.xz
+gh release download 2026-05-29 -p corpus-all-2026-05-29.tar.xz
 mkdir corpus && cd corpus
-tar -xJf ../corpus-all-2026-05-23.tar.xz
+tar -xJf ../corpus-all-2026-05-29.tar.xz
 # Result: corpus/{gen}/{bucket}/electricsheep.{gen}.{id}.flam3
 #         plus _index/, ATTRIBUTION.md
 ```
 
 ```sh
 # Path B — piecemeal, only the gens wanted
-gh release download 2026-05-23 -p 'gen-247-*.zip' -p 'gen-248-*.zip'
+gh release download 2026-05-29 -p 'gen-247-*.zip' -p 'gen-248-*.zip'
 mkdir -p corpus/247 corpus/248
-unzip gen-247-2026-05-23.zip -d corpus/247/
-unzip gen-248-2026-05-23.zip -d corpus/248/
+unzip gen-247-2026-05-29.zip -d corpus/247/
+unzip gen-248-2026-05-29.zip -d corpus/248/
 # Result: same per-gen subtree as Path A
 ```
 
 ```sh
 # Path C — combine: bulk first, patch a single gen from a later release
-tar -xJf corpus-all-2026-05-23.tar.xz
+tar -xJf corpus-all-2026-05-29.tar.xz
 unzip -o gen-247-2026-06-01.zip -d 247/   # newer per-gen snapshot
 ```
 
