@@ -5,7 +5,8 @@ Authoritative registry of open tasks. Every open task carries an `[ESF-NNN]` ID
 
 Forward-only — shipped work lives in [CHANGELOG.md](CHANGELOG.md); strategic
 narrative + current phase lives in [ROADMAP.md](ROADMAP.md). Pull a ticket
-forward when it becomes load-bearing.
+forward when it becomes load-bearing. When a ticket ships, its entry is **deleted
+here** (CHANGELOG owns the record); `git log -- BACKLOG.md` recovers the trail.
 
 > **Next ID: ESF-038** — increment when creating a new entry. Never reuse, even
 > for shipped/removed tasks.
@@ -15,320 +16,40 @@ forward when it becomes load-bearing.
 
 ---
 
-## 🔎 Code-review findings (filed 2026-05-29)
+## ⏸ Deferred / declined (2026-05-29 code review)
 
-Three-critic whole-codebase review (correctness · security · modern-GitHub
-standards). Top two are confirmed data-integrity bugs and are queued for the
-next work block.
+Decisions on the record; revisit if circumstances change. The resolved review
+tickets (ESF-017–028, 030–032, 035–036) shipped — see [CHANGELOG](CHANGELOG.md)
+phases 12g–12j.
 
-## [ESF-017] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `1b6552a`)** — `_FLAM3_RE` `\d{5}` silently drops ids ≥ 100,000
+## [ESF-029] security · XS · 🔒 · ⏸ DEFERRED — SRI hash for the stats-page Chart.js CDN tag
 
-> **✅ Resolved 2026-05-29.** Centralized the pattern as `FLAM3_RE` in
-> `layout.py` with `\d{5,}`; repointed all five consumers (importer / index /
-> migration / release / unseal) at it, deleting the five copies. Regression
-> test in `test_layout.py::TestFlam3Re` (5- and 6-digit ids). 250 tests green.
+`scripts/build_stats_page.py` is untracked and the page ships nowhere, so a
+missing `integrity=`/`crossorigin` has no live attack surface. Pull forward the
+moment the stats page is committed or published.
 
-**Symptom (verified 2026-05-29):** all five copies of `_FLAM3_RE` use `(\d{5})`
-— exactly five digits — but `layout.flam3_filename` formats ids with `:05d`
-(a *minimum* of 5; 6+ digits at id ≥ 100,000). Any sheep ≥ 100,000 would be
-written to disk correctly by `fetch` but then invisible to `import`, `index`,
-`migrate-chunked`, `release-build`, and `verify-unseal`. **Latent today** (gen
-247 max ~25.8k, 248 ~40k) but a real time-bomb on corpus growth / gen-249.
-**Files:** `importer.py:16`, `index.py:70`, `migration.py:32`, `release.py:54`,
-`unseal.py:42`. **Fix:** `\d{5,}` (or `\d+` with an int cap) in all five; add a
-regression test with a 6-digit id. Consider centralizing the regex in `layout.py`
-so there's one source of truth.
+## [ESF-033] infra · L · 🔧 · ⏸ DEFERRED — provenance-attested release workflow (SLSA)
 
-## [ESF-018] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `e51396d`)** — `fetch.py` writes unvalidated 200-OK bodies to corpus
+Provenance is meaningless for a locally-built artifact, so this requires moving
+releases into CI — which collides with the ~3 GB gitignored corpus CI doesn't
+have, for a threat model (tampered *executable* artifacts) that barely applies
+to inert CC genome XML. GitHub already auto-publishes per-asset SHA256 digests.
+Revisit if releases ever move to CI; the cheap first slice is a "verify your
+download" README snippet over those digests.
 
-> **✅ Resolved 2026-05-29.** Gated the 200 write on
-> `is_flam3_content(response.content)`; a non-flam3 200 (the `none\n` sentinel,
-> an HTML error page) is now a transient error — no write, no missing-entry, no
-> skip-local poisoning. Regression tests in
-> `test_fetch.py::TestFetchRange200NonFlame`.
+## [ESF-037] infra · 🪶 · ⏸ DEFERRED — PyPI packaging metadata
 
-**Symptom (verified 2026-05-29):** `is_flam3_content()` exists (`extract.py:38`,
-fully tested against `none\n` / HTML / empty) but has **zero callers**. `fetch.py`
-writes `response.content` verbatim on any HTTP 200 (`fetch.py:134-135`). A
-non-flame 200 (the documented `none\n` sentinel, an HTML error page) becomes a
-poisoned `.flam3`, then marks that id `skip_local` so the bad data is permanent.
-**Fix:** gate the write on `is_flam3_content(response.content)`; a 200 that fails
-the check is a transient error (no write, no missing-entry, retry/sleep). Add a
-fetch test for the `none\n`-body case.
+Not publishing to PyPI (a legitimate choice for corpus tooling). If that changes:
+fill `classifiers` / `keywords` / `[project.urls]` and publish via OIDC trusted
+publishing (not a long-lived token).
 
-## [ESF-019] chore · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — version metadata drift (3-way)
+## [ESF-034] infra · S · 🚫 WON'T DO — community-health files (CoC / CONTRIBUTING / templates)
 
-> **✅ Resolved 2026-05-29.** Collapsed to a single source: `__init__.__version__`
-> = `0.5.0`; `pyproject` now declares `dynamic = ["version"]` with
-> `[tool.hatch.version] path = "src/electric_sheep_fold/__init__.py"`, so the
-> packaged metadata is read from the code and can't drift. `pip install -e .`
-> rebuilt metadata to `0.5.0`. Regression test `test_version.py` asserts the
-> single-source wiring + that the User-Agent carries the version.
-
-`pyproject.toml:3` = `0.2.5`, `__init__.py:3` = `0.2.3`, actual code state =
-v0.4/v0.5. The semver field is orphaned under the ISO-date release model. **Fix:**
-pick one truth — bump to `0.5.0` to match the toolchain, or adopt `hatch-vcs`, or
-document that the package version intentionally tracks the toolchain spec, not the
-release tag. Sync `__init__.__version__` to match.
-
-## [ESF-020] bug · XS · 🐛 · ✅ **RESOLVED (2026-05-29)** — politeness jitter is one-sided
-
-> **✅ Resolved 2026-05-29 (docs-to-code, no behavior change).** User decision:
-> the code is the source of truth — `[20s, 25s]` (20s base + 0–5s) is *more*
-> polite than the literal "±5s" and stays that way. Corrected the wording in
-> CLAUDE.md / README / operations.md to match, documented the one-sided design
-> in `_sleep_with_jitter`, and locked it with `test_fetch.py::TestSleepJitterOneSided`
-> so it can't be "symmetrized" later.
-
-
-`fetch.py:49-52` computes `delay + uniform(0, jitter)` → range `[delay,
-delay+jitter]`, i.e. `[20, 25]`. The spec says "20s ±5s" = `[15, 25]`. Always ≥
-the base delay (more conservative, so no politeness violation) but a spec
-mismatch. **Fix:** `delay + uniform(-jitter, jitter)` with a `max(0, …)` floor —
-**preserve the 20/5 constants** (politeness values are sacrosanct; this changes
-only the formula's symmetry), or document the asymmetry as intentional.
-
-## [ESF-021] bug · XS · 🐛 · ✅ **RESOLVED (2026-05-29, `55c18b8`)** — `build_chunks_tar` aborts on one non-UTF-8 flam3
-
-> **✅ Resolved 2026-05-29.** `read_text` is now wrapped; a `UnicodeDecodeError`
-> skips the file (excluded from BOTH avail and chunk so they stay consistent)
-> with a warning, instead of aborting the artifact. Test
-> `test_chunk.py::test_build_chunks_tar_skips_non_utf8_file`.
-
-
-`chunk.py:211` uses `read_text(encoding="utf-8")`; a single non-UTF-8 `.flam3`
-(reachable via ESF-018, or rare attr-value bytes) raises `UnicodeDecodeError` and
-kills the whole artifact build. **Fix:** `read_bytes().decode("utf-8",
-errors="replace")` or per-file try/except + warning skip.
-
-## [ESF-022] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `04808ba`)** — corrupt files misclassified as valid animations
-
-> **✅ Resolved 2026-05-29.** The "junk after document element" branch now
-> requires ≥2 `<flame` markers to be classified as an animation; otherwise the
-> file is `corrupt` (`error="junk-after-document"`). Test
-> `test_index.py::…::test_single_flame_with_trailing_junk_is_corrupt`.
-
-
-`index.py:100-102` routes any `"junk after document element"` parse error to
-`_index_animation` (→ `kind="animation"`, `valid=True`). A genuinely corrupt
-single-flame file (`<flame>…</flame>GARBAGE`) is counted as a 1-frame animation
-rather than `corrupt`. **Fix:** only treat as animation when byte-counting finds
-≥ 2 `<flame` occurrences; otherwise `corrupt`.
-
-## [ESF-023] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `b274669`)** — unseal move can clobber a newer corpus file on resume
-
-> **✅ Resolved 2026-05-29.** `_move_flam3s_into_gen_dir` now skips the move when
-> `dest` exists (same id ⇒ same content under ES append-only immutability; dest
-> may be a newer concurrent-fetch write) — discards the redundant extracted copy
-> instead of clobbering. Test `test_unseal.py::TestMoveFlam3sNoClobber`.
-
-
-`unseal.py:292-296` does `os.replace(src, dest)` unconditionally; if a parallel
-`fetch` wrote a newer corpus file for the same id between steps, the unsealed
-(older) content silently overwrites it. **Fix:** check `dest.exists()` before
-replacing (skip-or-verify-identical), matching the docstring's stated
-idempotency contract.
-
-## [ESF-024] bug · S · 🐛 · ✅ **RESOLVED (2026-05-29, `d3d6a1e`)** — index can emit duplicate ids in hybrid sealed+loose state
-
-> **✅ Resolved 2026-05-29.** `iter_corpus_flames` dedups per gen with a `seen`
-> set, walking loose (v0.4-native) files first so they win over any leftover
-> sealed-zip transit copy of the same id. Test
-> `test_index.py::…::test_hybrid_sealed_plus_loose_yields_once_loose_wins`.
-
-
-`index.iter_corpus_flames` (`index.py:330-359`) `rglob`s loose files AND reads
-sealed-zip members; an id present in both (a real transit state) is emitted
-twice. `release._gather_gen_data` dedups; this path does not. **Fix:** dedup by
-id in `build_index`. Related to ESF-009 (id-set diff).
-
-## [ESF-025] test · M · 🧪 · ✅ **RESOLVED (2026-05-29)** — coverage gaps for load-bearing failure paths
-
-> **✅ Resolved 2026-05-29 (subsumed).** Every fix this session shipped red→green
-> with a regression test for exactly the failure paths this ticket named:
-> non-flam3 200 body (ESF-018), non-UTF-8 flam3 in chunk build (ESF-021),
-> corrupt-vs-animation classification (ESF-022), unseal clobber-on-resume
-> (ESF-023), hybrid sealed+loose dedup (ESF-024), entity-bomb XML (ESF-026).
-> The named gaps are closed.
-
-
-No tests for: a 200 non-flame body poisoning the corpus (ESF-018), non-UTF-8
-flam3 in `build_chunks_tar` (ESF-021), corrupt-vs-animation classification
-(ESF-022), or the unseal SIGKILL-resume clobber (ESF-023). Add regressions
-alongside each fix.
-
-## [ESF-026] security · S · 🔒 · ✅ **RESOLVED (2026-05-29, `4d8f353`)** — parse untrusted XML with `defusedxml`
-
-> **✅ Resolved 2026-05-29.** Both `ET.fromstring` callsites (`extract.py`,
-> `index.py`) now use `defusedxml.ElementTree`; `except` clauses broadened to
-> `(ET.ParseError, DefusedXmlException)` so an entity/DTD/external bomb is
-> classified `corrupt` (or non-flame), never expanded or crashing the build.
-> Added `defusedxml>=0.7` dep. Test
-> `test_index.py::…::test_entity_bomb_is_corrupt_not_expanded`.
-
-
-Network-sourced `.flam3` is parsed with stdlib `ElementTree` (`extract.py`,
-`index.py`). XXE is blocked by Python's expat defaults, but **billion-laughs
-internal-entity expansion is reachable** → build-host DoS during `index` /
-`release-build`. **Fix:** drop-in `defusedxml.ElementTree`; add it to deps.
-
-## [ESF-027] security · XS · 🔒 · ✅ **RESOLVED (2026-05-29)** — document the plaintext-HTTP trust boundary
-
-> **✅ Resolved 2026-05-29.** Documented in `SECURITY.md` §"Known trust
-> boundaries": the live source is fetched over plaintext `http://v3d0...` (no
-> TLS upstream), so fetched bytes are unauthenticated — accepted on the record,
-> mitigated by defusedxml parsing, never executing content, and rejecting
-> non-flam3 200s.
-
-
-The live server is fetched over `http://v3d0.sheepserver.net` (`layout.py:6`);
-the 200 body is written with no TLS / hash / signature, so an on-path attacker
-can poison the corpus (and amplifies ESF-026). Upstream is a 2010-era lighttpd
-likely without TLS, so this may be unavoidable — but it should be an explicit,
-documented trust boundary (and a standing reason to keep ESF-026 done).
-
-## [ESF-028] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — commit `uv.lock`
-
-> **✅ Resolved 2026-05-29.** `uv.lock` (now pinning the full graph incl.
-> `defusedxml` from ESF-026, with sha256 hashes) is tracked. Reverses the
-> earlier leave-it-untracked stance — a CLI that ingests untrusted data and
-> publishes public artifacts should pin its supply chain.
-
-
-`uv.lock` pins exact versions with sha256 hashes but is **untracked**; runtime
-deps float on `>=` lower bounds, so a fresh install resolves to whatever is
-newest on PyPI with no hash verification. For a CLI that ingests untrusted data
-and publishes public artifacts, commit the lockfile.
-
-## [ESF-029] security · XS · 🔒 · ⏸ **DEFERRED (2026-05-29)** — SRI hash for Chart.js in the stats page
-
-> **⏸ Deferred 2026-05-29.** `scripts/build_stats_page.py` is untracked and the
-> generated page ships nowhere, so a missing SRI hash has no live attack surface.
-> Pull forward — add `integrity=`/`crossorigin` to the CDN `<script>` — the
-> moment the stats page is committed or published.
-
-
-`scripts/build_stats_page.py:146` loads `chart.js@4.4.1` from jsDelivr with no
-`integrity=`/`crossorigin`. Low priority — the page is currently an untracked
-local artifact — but add SRI before it's ever published.
-
-## [ESF-030] infra · S · 🔧 · ✅ **RESOLVED (2026-05-29)** — stand up CI (no `.github/workflows/` exists)
-
-> **✅ Resolved 2026-05-29.** Added `.github/workflows/ci.yml`: pytest on
-> `push: main` + `pull_request`, matrix py3.11/3.12/3.13, actions SHA-pinned
-> (`checkout` v6.0.2, `setup-uv` v8.1.0), top-level `permissions: contents:
-> read`, uv cache, `uv sync --locked` (also guards the lockfile). First live
-> run happens when the branch is pushed / a PR opens. **Follow-ups:** ESF-031
-> (add ruff+mypy steps), ESF-036 (require this check via a branch ruleset).
-
-
-The ~207-test suite runs on faith — nothing executes it on push/PR. **Fix:** add
-`ci.yml` running `pytest` across a `python-version: [3.11, 3.12, 3.13]` matrix on
-`pull_request` + `push: main`; pin actions to full commit SHA; top-level
-`permissions: contents: read`; enable dep caching. Highest-leverage hygiene item.
-
-## [ESF-031] infra · S · 🔧 · ✅ **RESOLVED (2026-05-29)** — ruff + mypy config, enforced in CI
-
-> **✅ Resolved 2026-05-29.** Added `[tool.ruff]` (select E/F/I, line-length
-> 100 — 88 was never followed) + `[tool.mypy]` (ignore-missing-imports) to
-> pyproject, plus `ruff`/`mypy` to the dev extra. Fixed all findings: auto-fixed
-> unused imports + import order, wrapped policy at 100 with `# noqa: E501` on 7
-> unsplittable INDEX.md jq-recipe literals, typed `_load_verified_log` →
-> `dict[str, Any]` (cleared 6 `int(object)` mypy errors), moved test_chunk
-> mid-file imports to top. CI `lint` job now runs `ruff check` + `mypy src`.
-> Debt turned out trivial (≈13 real items), not the M–L I'd feared.
-
-
-`.gitignore` lists `.ruff_cache/` + `.mypy_cache/` (so both run locally) but
-`pyproject.toml` has no `[tool.ruff]`/`[tool.mypy]` and the `dev` extra omits
-them. The quality bar is invisible/unreproducible. **Fix:** add both to the `dev`
-extra, add config blocks, run in CI (depends on ESF-030).
-
-## [ESF-032] infra · XS · 🔒 · ✅ **RESOLVED (2026-05-29)** — `SECURITY.md` + private vulnerability reporting
-
-> **✅ Resolved 2026-05-29.** Added `SECURITY.md` (supported-versions policy +
-> private reporting channel + trust boundaries) and enabled GitHub Private
-> Vulnerability Reporting on the repo (`{"enabled": true}`).
-
-
-No security policy and no documented reporting channel for a tool that makes
-outbound HTTP requests. **Fix:** add `SECURITY.md` (supported versions +
-reporting channel) and enable GitHub Private Vulnerability Reporting.
-
-## [ESF-033] infra · L · 🔧 · ⏸ **DEFERRED (2026-05-29)** — provenance-attested release workflow
-
-> **⏸ Deferred 2026-05-29 (discussed with user).** Full SLSA provenance requires
-> re-architecting releases to build **in CI** (provenance is meaningless for a
-> locally-built artifact) — which collides with the ~3 GB gitignored corpus that
-> CI doesn't have (would need to download the prior `corpus-all` Release,
-> extract, build, attest, upload), while the polite multi-day live-fetch must
-> stay local. High effort (L), and the threat model (tampered *executable*
-> artifacts → RCE) barely applies to inert CC genome XML parsed with defusedxml.
-> GitHub already auto-publishes per-asset SHA256 digests (Jun 2025) for basic
-> integrity. **Revisit if/when releases move to CI for other reasons;** the cheap
-> middle path (document digests + a "verify your download" README snippet) is the
-> first slice to pull forward if integrity ever becomes a felt need.
-
-
-Releases are hand-assembled + uploaded (`scripts/build_release.sh` ends in a
-copy-paste `gh release create`). No SLSA provenance; consumers `tar -xJf` blindly
-with no verification story. **Fix:** tag-triggered workflow running `release-build`
-+ `actions/attest-build-provenance` + upload; add a "verify your download" snippet
-(`gh attestation verify` / asset digests) to the README.
-
-## [ESF-034] infra · S · 🐑 · 🚫 **WON'T DO (2026-05-29)** — community-health files
-
-> **🚫 Declined 2026-05-29 (reviewed item-by-item with the user).** CoC,
-> CONTRIBUTING.md, and issue/PR templates were each assessed and cut as ceremony
-> for a solo niche repo: no contributor community to govern; the PR checklist is
-> redundant with the now-enforced CI gate; README + CLAUDE.md already cover dev
-> conventions. Each is a ~2-minute add if a real contributor community ever
-> forms. (SECURITY.md from the same checklist was kept — see ESF-032.)
-
-
-Missing `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue/PR templates. `has_issues`
-is on but there's no triage scaffolding or stated contribution workflow. A
-lightweight `CONTRIBUTING.md` is the highest-value one.
-
-## [ESF-035] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — Dependabot (+ optional CodeQL)
-
-> **✅ Resolved 2026-05-29.** Added `.github/dependabot.yml` — weekly version +
-> security updates for the `uv` ecosystem (reads pyproject + uv.lock natively,
-> GA Mar 2025) and the SHA-pinned `github-actions`. CodeQL left as optional
-> (low value for a small pure-Python CLI).
-
-
-`dependabot_security_updates` is disabled; no `.github/dependabot.yml`. Deps
-float unmonitored. **Fix:** add a Dependabot config; CodeQL is lower priority for
-a small pure-Python CLI but cheap to add.
-
-## [ESF-036] infra · XS · 🔧 · ✅ **RESOLVED (2026-05-29)** — branch-protection ruleset on `main`
-
-> **✅ Resolved 2026-05-29.** `main` branch protection requires the 4 CI checks
-> (`ruff + mypy`, `pytest (py3.11/3.12/3.13)`), `strict` (up-to-date) on.
-> **`enforce_admins: false`** by deliberate choice — the gate applies to PRs /
-> future contributors while the solo maintainer keeps the direct-FF-push-to-main
-> convention. **Caveat:** the required contexts are matrix-coupled — changing the
-> Python matrix in `ci.yml` means updating the required-checks list (or switch to
-> a single aggregator `ci-ok` job; filed as a future hardening).
-
-
-`main` is unprotected (`protected: false`, 0 rulesets); the documented
-FF-merge-after-verify workflow is not enforced. **Fix (after ESF-030):** ruleset
-requiring the CI status check + linear history.
-
-## [ESF-037] infra · 🪶 · ⏸ **DEFERRED (2026-05-29)** — packaging metadata polish (only if PyPI is ever wanted)
-
-> **⏸ Deferred 2026-05-29.** Not publishing to PyPI (a legitimate choice for
-> corpus tooling). If that ever changes: fill `classifiers` / `keywords` /
-> `[project.urls]`, and publish via OIDC trusted publishing (not a long-lived
-> token). README should then state the install path explicitly.
-
-
-Not on PyPI (a legitimate choice for corpus tooling). If publishing is ever
-desired: fill `classifiers`, `keywords`, `[project.urls]`, and use OIDC trusted
-publishing (not a long-lived token). README should state "install from source;
-not published to PyPI." Defer unless publishing becomes a goal.
+Reviewed item-by-item and cut as ceremony for a solo niche repo: no contributor
+community to govern; the PR checklist is redundant with the enforced CI gate;
+README + CLAUDE.md already cover dev conventions. A ~2-minute add if a real
+contributor community ever forms. (SECURITY.md from the same checklist shipped —
+phase 12j.)
 
 ---
 
@@ -386,7 +107,8 @@ fallback. Defer until corpus growth makes single-machine release-build painful.
 `verify_unseal_consistency` and `verify_chunked_consistency` catch deletions via
 count shrinkage, but a `missing.txt` overwrite that ADDS bogus entries while
 losing real ones could net to the same total and slip through. A stronger id-set
-diff against the post-migrate baseline closes the gap. Related: ESF-024.
+diff against the post-migrate baseline closes the gap. Related: the hybrid-dedup
+fix (ESF-024, shipped phase 12g).
 
 ## 🛰️ Live preservation
 
