@@ -3,13 +3,15 @@
 Walks every loose `.flam3` file in `corpus/{gen}/{bucket}/` (the v0.4
 chunked layout) or surviving v0.2 sealed zips during one-shot migration
 windows, parses each, and emits:
-  - `index.json` — v0.5 envelope ``{_schema_version: 5, _build_date,
+  - `index.json` — v0.6 envelope ``{_schema_version: 6, _build_date,
     genomes: [...]}``. Per-genome record carries structural features
     plus 5 pyr3 AutoRoute GPU-safety fields (has_hyper_trig, has_edisc,
     max_abs_affine_coef, xform_count_post_symmetry, has_density_estimator)
     plus v0.5 malformation flags (has_nan_camera, has_nan_in_xforms),
     always-present symmetry_kind (int | null), and has_xaos (renamed
-    from has_chaos to match community naming).
+    from has_chaos to match community naming). v0.6 adds provenance
+    (version) and the tone-map family (gamma, vibrancy,
+    estimator_minimum, estimator_curve).
   - `INDEX.md` — aggregations + recipe table for agentic scanning.
 
 Per-flame `kind`: `genome` (single-flame, fully indexed) · `animation`
@@ -35,7 +37,7 @@ from defusedxml.common import DefusedXmlException
 
 from electric_sheep_fold.layout import FLAM3_RE as _FLAM3_RE
 
-INDEX_SCHEMA_VERSION = 5
+INDEX_SCHEMA_VERSION = 6
 
 # Pyr3 AutoRoute GPU-safety: variations whose f32 denominator cancels at
 # ±π/2 (or n*π/2) — tan/sec/csc/cot family + hyperbolic siblings.
@@ -144,6 +146,8 @@ def _index_genome(rec: dict, root) -> dict:
     rec["name"] = root.get("name", "")
     rec["nick"] = root.get("nick", "")
     rec["url"] = root.get("url", "")
+    # v0.6 provenance (ESF-003): the renderer/version that produced the genome.
+    rec["version"] = root.get("version", "")
     rec["dims"] = root.get("size", "")
     rec["rotate"] = _f(root.get("rotate", "0"))
     rec["brightness"] = _f(root.get("brightness", "4"))
@@ -160,6 +164,16 @@ def _index_genome(rec: dict, root) -> dict:
     # when the runtime path uses it; absence of the attribute means the
     # baseline (off / disabled).
     rec["has_density_estimator"] = _f(root.get("estimator_radius", "0")) > 0
+
+    # v0.6 tone-map diversity (ESF-002): the rest of the tone-map /
+    # density-estimator family alongside has_density_estimator. Effective
+    # values — flam3 documented defaults when the attribute is absent
+    # (gamma 4.0, vibrancy 1.0, estimator_minimum 0.0, estimator_curve 0.4),
+    # matching the existing brightness/highlight_power convention.
+    rec["gamma"] = _f(root.get("gamma", "4"))
+    rec["vibrancy"] = _f(root.get("vibrancy", "1"))
+    rec["estimator_minimum"] = _f(root.get("estimator_minimum", "0"))
+    rec["estimator_curve"] = _f(root.get("estimator_curve", "0.4"))
 
     sym = root.find("symmetry")
     rec["has_symmetry"] = sym is not None
@@ -391,10 +405,10 @@ def build_index(
 ) -> dict:
     """Walk the corpus, parse each flam3, emit ``index.json`` + ``INDEX.md``.
 
-    v0.5 ``index.json`` envelope::
+    v0.6 ``index.json`` envelope::
 
         {
-          "_schema_version": 5,
+          "_schema_version": 6,
           "_build_date": "YYYY-MM-DD",
           "genomes": [<record>, ...]
         }
@@ -402,10 +416,12 @@ def build_index(
     Per-record fields include the 5 pyr3 AutoRoute GPU-safety fields
     (``has_hyper_trig``, ``has_edisc``, ``max_abs_affine_coef``,
     ``xform_count_post_symmetry``, ``has_density_estimator``) plus the
-    v0.5 additions: ``has_nan_camera`` / ``has_nan_in_xforms``
-    (parser-detectable structural malformations), always-present
-    ``symmetry_kind`` (``int | null``), and ``has_xaos`` (renamed
-    from ``has_chaos`` in v0.5).
+    v0.5 additions (``has_nan_camera`` / ``has_nan_in_xforms``,
+    always-present ``symmetry_kind`` (``int | null``), ``has_xaos``)
+    and the v0.6 additions: ``version`` (provenance; the renderer that
+    produced the genome) and the tone-map family ``gamma`` /
+    ``vibrancy`` / ``estimator_minimum`` / ``estimator_curve``
+    (effective values, flam3 defaults when absent).
 
     Returns a summary dict (total / genomes / animations / corrupt /
     variations distinct count) — useful for callers / tests / CLI.
@@ -572,6 +588,41 @@ def _render_markdown(records: list[dict]) -> str:
         L.append(f"| `{k}` | {v:,} | {notes.get(k, '')} |")
     L.append("")
 
+    # Tone-map + provenance (v0.6)
+    L.append("## 🎛️ Tone-map & provenance (v0.6)")
+    L.append("")
+    L.append(
+        "Effective tone-map values (flam3 defaults when the attribute is "
+        "absent: gamma 4.0, vibrancy 1.0, estimator_minimum 0.0, "
+        "estimator_curve 0.4). `version` is the renderer that produced the "
+        "genome."
+    )
+    L.append("")
+    nondefault = {
+        "gamma != 4.0": sum(1 for r in genomes if r.get("gamma") != 4.0),
+        "vibrancy != 1.0": sum(1 for r in genomes if r.get("vibrancy") != 1.0),
+        "estimator_minimum > 0": sum(
+            1 for r in genomes if r.get("estimator_minimum", 0) > 0
+        ),
+        "estimator_curve != 0.4": sum(
+            1 for r in genomes if r.get("estimator_curve") != 0.4
+        ),
+    }
+    L.append("| Field | Genomes with non-default value |")
+    L.append("|-------|-------------------------------:|")
+    for k, v in nondefault.items():
+        L.append(f"| `{k}` | {v:,} |")
+    L.append("")
+    ver_hist: Counter[str] = Counter(r.get("version", "") for r in genomes)
+    L.append("Top `version` (renderer provenance):")
+    L.append("")
+    L.append("| version | Genomes |")
+    L.append("|---------|--------:|")
+    for ver, n in ver_hist.most_common(10):
+        label = ver if ver else "(unset)"
+        L.append(f"| `{label}` | {n:,} |")
+    L.append("")
+
     # Corpus malformations (v0.5)
     L.append("## 🧨 Corpus malformations (v0.5)")
     L.append("")
@@ -692,13 +743,15 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("## 🛠️ Query recipes")
     L.append("")
     L.append(
-        "**v0.5 schema note:** `index.json` is an envelope "
+        "**v0.6 schema note:** `index.json` is an envelope "
         "`{_schema_version, _build_date, genomes: [...]}`. Recipes use "
         "`.genomes[]` as the iterator. **Default filter:** "
         "`kind == \"genome\"` — exclude animations + corrupt. "
-        "Schema bumped to **v5** (2026-05-23): adds `has_nan_camera` / "
-        "`has_nan_in_xforms`, makes `symmetry_kind` always-present "
-        "(`int | null`), renames `has_chaos` → `has_xaos`."
+        "v0.5 added `has_nan_camera` / `has_nan_in_xforms`, made "
+        "`symmetry_kind` always-present (`int | null`), renamed "
+        "`has_chaos` → `has_xaos`. **v6** adds `version` (renderer "
+        "provenance) and the tone-map family `gamma` / `vibrancy` / "
+        "`estimator_minimum` / `estimator_curve`."
     )
     L.append("")
     L.append("Check schema version + build date:")
@@ -729,6 +782,11 @@ def _render_markdown(records: list[dict]) -> str:
     L.append("Find low-complexity baseline genomes:")
     L.append("```")
     L.append('jq -r \'.genomes[] | select(.kind == "genome" and .xform_count <= 2 and (.has_xaos | not)) | .id\' index.json | head')  # noqa: E501
+    L.append("```")
+    L.append("")
+    L.append("Find tonally-distinctive genomes (non-default gamma or vibrancy) by a given renderer:")  # noqa: E501
+    L.append("```")
+    L.append('jq -r \'.genomes[] | select(.kind == "genome" and (.gamma != 4 or .vibrancy != 1)) | "\\(.id)\\t\\(.version)\\tgamma=\\(.gamma)\\tvib=\\(.vibrancy)"\' index.json | head')  # noqa: E501
     L.append("```")
     L.append("")
     L.append("Inspect one flame in full:")

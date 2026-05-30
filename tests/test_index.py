@@ -288,8 +288,8 @@ class TestBuildIndex:
         index_path = out_dir / "index.json"
         assert index_path.exists()
         envelope = json.loads(index_path.read_text())
-        # v0.5 envelope
-        assert envelope["_schema_version"] == 5
+        # v0.6 envelope
+        assert envelope["_schema_version"] == 6
         assert isinstance(envelope["_build_date"], str)
         records = envelope["genomes"]
         assert len(records) == 3
@@ -455,7 +455,7 @@ class TestPyr3AutoRouteFields:
         assert rec["has_density_estimator"] is False
 
 
-class TestIndexSchemaV5:
+class TestIndexSchemaV6:
     def test_envelope_has_schema_version_and_build_date(self, tmp_path: Path):
         corpus = tmp_path / "corpus"
         (corpus / "247" / "00000").mkdir(parents=True)
@@ -466,7 +466,7 @@ class TestIndexSchemaV5:
         build_index(corpus, out_dir, build_date=date(2026, 5, 23))
 
         env = json.loads((out_dir / "index.json").read_text())
-        assert env["_schema_version"] == INDEX_SCHEMA_VERSION == 5
+        assert env["_schema_version"] == INDEX_SCHEMA_VERSION == 6
         assert env["_build_date"] == "2026-05-23"
         assert "genomes" in env
         assert isinstance(env["genomes"], list)
@@ -481,14 +481,14 @@ class TestIndexSchemaV5:
         assert len(env["_build_date"]) == 10
         assert env["_build_date"][4] == "-"
 
-    def test_schema_version_is_v5(self, tmp_path: Path):
-        """Explicit v0.5 schema-version assertion against an empty corpus."""
+    def test_schema_version_is_v6(self, tmp_path: Path):
+        """Explicit v0.6 schema-version assertion against an empty corpus."""
         corpus = tmp_path / "corpus"
         corpus.mkdir()
         out_dir = tmp_path / "out"
         build_index(corpus, out_dir)
         data = json.loads((out_dir / "index.json").read_text())
-        assert data["_schema_version"] == 5
+        assert data["_schema_version"] == 6
 
 
 # ----- v0.5 malformation flags + symmetry_kind null + has_xaos rename --------
@@ -564,3 +564,45 @@ class TestSymmetryKindAlwaysPresent:
         rec = parse_flame(GENOME_RICH, 248, 200)
         assert rec["has_symmetry"] is True
         assert rec["symmetry_kind"] == 2
+
+
+# ----- v0.6 richness fields: version (ESF-003) + tone-map (ESF-002) ----------
+
+
+GENOME_TONEMAP = (
+    b'<flame name="tonemap" size="640 480" version="flam3-3.0.1" '
+    b'gamma="2.5" vibrancy="0.8" estimator_minimum="0.5" estimator_curve="0.6">'
+    b'  <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>'
+    b'</flame>'
+)
+
+
+class TestIndexV6RichnessFields:
+    """ESF-003 provenance `version` + ESF-002 tone-map family. Both are
+    `<flame>`-root attribute reads; absent attrs fall back to flam3 defaults,
+    matching the existing brightness/highlight_power convention."""
+
+    def test_version_present(self):
+        rec = parse_flame(GENOME_TONEMAP, 248, 1)
+        assert rec["version"] == "flam3-3.0.1"
+
+    def test_version_empty_when_absent(self):
+        # GENOME_LINEAR carries no version attr.
+        rec = parse_flame(GENOME_LINEAR, 248, 1)
+        assert rec["version"] == ""
+
+    def test_tonemap_fields_present(self):
+        rec = parse_flame(GENOME_TONEMAP, 248, 1)
+        assert rec["gamma"] == 2.5
+        assert rec["vibrancy"] == 0.8
+        assert rec["estimator_minimum"] == 0.5
+        assert rec["estimator_curve"] == 0.6
+
+    def test_tonemap_defaults_when_absent(self):
+        # flam3 documented defaults: gamma 4.0, vibrancy 1.0,
+        # estimator_minimum 0.0, estimator_curve 0.4.
+        rec = parse_flame(GENOME_LINEAR, 248, 1)
+        assert rec["gamma"] == 4.0
+        assert rec["vibrancy"] == 1.0
+        assert rec["estimator_minimum"] == 0.0
+        assert rec["estimator_curve"] == 0.4

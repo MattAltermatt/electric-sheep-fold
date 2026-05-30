@@ -10,7 +10,7 @@ The corpus is preserved and stable — **10 generations, ~166k flames / ~52k
 genomes**, append-only chunked layout, published as ISO-date GitHub Releases
 (latest [`2026-05-23`](https://github.com/MattAltermatt/electric-sheep-fold/releases/tag/2026-05-23)).
 The `sheep-fold` toolchain is feature-complete for the **preserve → index →
-release** loop: index schema v5, and the renderer-facing `corpus-chunks` delivery
+release** loop: index schema v6, and the renderer-facing `corpus-chunks` delivery
 artifact powering pyr3.app share-URLs. `main` is CI-gated (ruff + mypy + pytest
 3.11–3.13), branch-protected, and supply-chain-pinned. Full history:
 [CHANGELOG.md](CHANGELOG.md).

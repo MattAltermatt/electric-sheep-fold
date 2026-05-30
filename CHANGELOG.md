@@ -8,6 +8,30 @@
 
 ## Pending — next dated release
 
+### Phase 12k — index schema v6: provenance + tone-map richness (ESF-002, ESF-003)
+
+Bumped `index.json` to `_schema_version: 6` with five new per-genome fields:
+
+- **ESF-003 — `version`.** The `<flame version=…>` renderer-provenance string
+  (`""` when absent). Surfaces real forensic spread across the corpus — e.g.
+  ~10.8k genomes from `FLAM3-LNX-v3.1.1`, down to individual `-dirty` builds.
+- **ESF-002 — tone-map family.** `gamma`, `vibrancy`, `estimator_minimum`,
+  `estimator_curve` — the rest of the density-estimator / tone-map family
+  alongside the existing `has_density_estimator`. Stored as effective values
+  (flam3 defaults when the attribute is absent: 4.0 / 1.0 / 0.0 / 0.4),
+  matching the existing `brightness` / `highlight_power` convention.
+
+`INDEX.md` gains a "Tone-map & provenance" section (non-default counts + top
+renderer versions) and a tone-map query recipe. CLAUDE.md / README / SKILL.md
+envelope docs updated to v6.
+
+**ESF-006 (palette-hash) declined this round** — a 3-agent investigation
+confirmed it would work (exact hashing buckets 65–95% of genomes; perceptual
+adds <1pp before over-merging) but found no consumer: pyr3 parses palettes from
+raw flam3, no jq recipe groups by palette, and the only future consumer (gallery
+ESF-016) is deferred + blocked. Marked 🚫 WON'T DO in BACKLOG with the findings
+preserved.
+
 ### Phase 12j — security & supply-chain hygiene (ESF-027, ESF-032, ESF-035)
 
 - **ESF-032 — SECURITY.md + private reporting.** Added a security policy and

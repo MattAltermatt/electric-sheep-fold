@@ -138,8 +138,8 @@ These must NOT be violated without a deliberate spec update:
   `verify_chunked_consistency` (v0.4); if any gen has flat `.flam3`
   files at the gen root the daemon refuses to start with "run
   migrate-chunked first."
-- **Index v0.5 envelope:** `corpus/_index/index.json` is an object
-  `{_schema_version: 5, _build_date: "YYYY-MM-DD", genomes: [...]}`.
+- **Index v0.6 envelope:** `corpus/_index/index.json` is an object
+  `{_schema_version: 6, _build_date: "YYYY-MM-DD", genomes: [...]}`.
   jq recipes use `.genomes[]`, not `.[]`. Five v0.4 pyr3 AutoRoute
   GPU-safety fields per genome (`has_hyper_trig`, `has_edisc`,
   `max_abs_affine_coef`, `xform_count_post_symmetry`,
@@ -147,7 +147,10 @@ These must NOT be violated without a deliberate spec update:
   adds parser-detectable malformation flags (`has_nan_camera`,
   `has_nan_in_xforms`), makes `symmetry_kind` always-present
   (`int | null`), and renames `has_chaos` → `has_xaos` to match
-  community naming. See
+  community naming. v0.6 (2026-05-29) adds `version` (renderer
+  provenance, ESF-003) and the tone-map family `gamma` / `vibrancy` /
+  `estimator_minimum` / `estimator_curve` (effective values, flam3
+  defaults when absent, ESF-002). See
   [`.claude/skills/pyr3-corpus-index/SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md).
 - **MANIFEST.csv + missing.txt are the release seam:** every per-gen
   release zip contains `MANIFEST.csv` (11-col schema from v0.2 spec
