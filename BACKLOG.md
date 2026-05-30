@@ -229,7 +229,20 @@ No security policy and no documented reporting channel for a tool that makes
 outbound HTTP requests. **Fix:** add `SECURITY.md` (supported versions +
 reporting channel) and enable GitHub Private Vulnerability Reporting.
 
-## [ESF-033] infra · M · 🔧 · open — provenance-attested release workflow
+## [ESF-033] infra · L · 🔧 · ⏸ **DEFERRED (2026-05-29)** — provenance-attested release workflow
+
+> **⏸ Deferred 2026-05-29 (discussed with user).** Full SLSA provenance requires
+> re-architecting releases to build **in CI** (provenance is meaningless for a
+> locally-built artifact) — which collides with the ~3 GB gitignored corpus that
+> CI doesn't have (would need to download the prior `corpus-all` Release,
+> extract, build, attest, upload), while the polite multi-day live-fetch must
+> stay local. High effort (L), and the threat model (tampered *executable*
+> artifacts → RCE) barely applies to inert CC genome XML parsed with defusedxml.
+> GitHub already auto-publishes per-asset SHA256 digests (Jun 2025) for basic
+> integrity. **Revisit if/when releases move to CI for other reasons;** the cheap
+> middle path (document digests + a "verify your download" README snippet) is the
+> first slice to pull forward if integrity ever becomes a felt need.
+
 
 Releases are hand-assembled + uploaded (`scripts/build_release.sh` ends in a
 copy-paste `gh release create`). No SLSA provenance; consumers `tar -xJf` blindly
