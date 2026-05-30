@@ -35,11 +35,15 @@ When ES rolls gen 249+: one-line `LIVE_GENS` edit in `layout.py`, then
 `fetch-all`. If a *dead* gen appears, recover the archive-scraper scripts from git
 history (see operations.md). Tracked as [ESF-010] in BACKLOG.
 
-### Index ergonomics (pull-forward)
+### Index ergonomics — resolved
 
-SQLite query layer, palette-hash, curated examples, incremental rebuild —
-[ESF-004–007] in BACKLOG. Pull forward when corpus growth slows or pyr3
-integration demands faster queries.
+Audited 2026-05-29: the v6 `index.json` + the `jq` recipes in
+[`SKILL.md`](.claude/skills/pyr3-corpus-index/SKILL.md) **are** the ergonomics
+deliverable. The SQLite query layer (ESF-004), curated examples (ESF-005), and
+palette-hash (ESF-006) were declined — no in-repo consumer, jq scans measure
+~0.9s, and fixture curation / query caches belong to the consumer (pyr3), derived
+from our canonical index. Only incremental rebuild ([ESF-007]) stays deferred,
+revisitable if the corpus grows enough that the ~90s full rebuild becomes painful.
 
 ## 🚧 Todos (next wake-up)
 

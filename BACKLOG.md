@@ -49,22 +49,13 @@ stay gaps" invariant.
 
 ---
 
-## 🔍 Index query ergonomics (pull forward when `index.json` scans slow / pyr3 demands)
+## 🔍 Index rebuild ergonomics (pull forward when the full ~90s rebuild becomes painful)
 
 ## [ESF-007] feature · S · 🐑 · open — incremental index rebuild
 
 Rebuild only gens whose `_chunked-verified.json` `loose_count` changed since last
 index — chunked layout makes this trivial (per-bucket mtime). Foundational: makes
 every later index field cheap to backfill.
-
-## [ESF-004] feature · M · 🐑 · open — SQLite-backed query interface
-
-Faster than scanning the 60+ MB `index.json` for repeat lookups. Build on demand
-from `index.json`; `index.json` stays canonical.
-
-## [ESF-005] feature · S · 🐑 · open — curated examples file
-
-Hand-picked pyr3-parity references + stress-test cases (a `curated.md` analog).
 
 ---
 
@@ -173,6 +164,29 @@ download" README snippet over those digests.
 Not publishing to PyPI (a legitimate choice for corpus tooling). If that changes:
 fill `classifiers` / `keywords` / `[project.urls]` and publish via OIDC trusted
 publishing (not a long-lived token).
+
+## [ESF-004] feature · M · 🐑 · 🚫 WON'T DO — SQLite-backed query interface
+
+Optimizes a problem we don't have. The premise — "scanning the 62 MB `index.json`
+is slow for repeat lookups" — is false: a full filtered `jq` scan measures
+**0.93s** (2026-05-29). No speed pain for a query DB to relieve. And if a consumer
+ever does enough repeat lookups to want an indexed substrate (SQLite / DuckDB /
+pandas), that is a consumer-side cache derived from the canonical `index.json` —
+pyr3's concern, not the corpus repo's. electric-sheep-fold's job ends at emitting
+a clean, `jq`-queryable canonical index, which it does. Revisit only if `jq` scans
+become a measured bottleneck inside this repo's own tooling.
+
+## [ESF-005] feature · S · 🐑 · 🚫 WON'T DO — curated examples file (pyr3's responsibility)
+
+Fixture curation is a consumer judgment, not the corpus repo's. The stated purpose
+("pyr3-parity references + stress-test cases") is pyr3-specific — pyr3 knows which
+genomes stress *its* renderer (GPU f32 path, AutoRoute thresholds,
+`NotImplementedError` branches), and that picture drifts as pyr3 evolves.
+electric-sheep-fold's job is to make the corpus queryable, which is done: the v6
+index + the `jq` recipes in `.claude/skills/pyr3-corpus-index/SKILL.md` already
+surface examples by category (GPU-safe, hyper-trig, edisc, NaN-malformed, …) on
+demand. A curated file would add only hand-vetting over those recipes, and that
+vetting belongs to pyr3, built from our index.
 
 ## [ESF-006] feature · S · 🐑 · 🚫 WON'T DO — palette-hash field for de-duped browsing
 
