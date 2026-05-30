@@ -4,7 +4,9 @@
 
 ```sh
 uv pip install -e ".[dev]"         # editable install + pytest
-pytest -q                          # full test suite (~207 tests, no real network)
+pytest -q                          # full test suite (~261 tests, no real network)
+ruff check src tests               # lint (E/F/I, line-length 100) — enforced in CI
+mypy src/electric_sheep_fold       # type-check — enforced in CI
 sheep-fold --help                  # CLI: fetch · fetch-all · import · status · index · release-build · migrate-chunked · verify-chunked · unseal · verify-unseal · chunk
 sheep-fold index                   # rebuild corpus/_index/{index.json,INDEX.md} for pyr3 / agentic queries
 sheep-fold release-build --date YYYY-MM-DD   # build/release/{gen-N-DATE.zip, corpus-all-DATE.tar.xz, corpus-chunks-DATE.tar, …}
@@ -33,6 +35,9 @@ index in sync with the corpus.
 - **Commits:** terse, no body, no `Co-Authored-By` trailer. `git log --oneline`
   should read like a story.
 - **Branches:** `feature/<topic>` for work. FF-merge to `main` after user verify.
+- **CI gates `main`:** every push / PR runs `ruff` + `mypy` + `pytest` across
+  Python 3.11–3.13 (`.github/workflows/ci.yml`); `main` is branch-protected to
+  require them (admin can still direct-push). Run all three locally before pushing.
 - **Docs are ship dependencies:** README, VISION, ROADMAP, CHANGELOG, BACKLOG all
   track code. Update in the same commit as the code they describe.
 - **Task tracking (pyr3-style):** every open task carries an `[ESF-NNN]` ID in
@@ -188,7 +193,7 @@ These must NOT be violated without a deliberate spec update:
 - `src/electric_sheep_fold/` — `layout`, `manifest`, `extract`, `fetch`,
   `importer`, `migration`, `index`, `release`, `chunk`, `unseal`, `cli`
 - `src/electric_sheep_fold/data/ATTRIBUTION.md` — the Sheep-Pack template
-- `tests/` — pytest suites; pure / mock-driven, no real network (~207 tests)
+- `tests/` — pytest suites; pure / mock-driven, no real network (~261 tests)
 - `corpus/` — local data (gitignored, chunked layout). Auto-materialized
   on first `fetch`.
 - `build/release/` — derived release artifacts (gitignored, rebuilt by
