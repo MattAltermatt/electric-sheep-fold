@@ -130,7 +130,15 @@ sealed-zip members; an id present in both (a real transit state) is emitted
 twice. `release._gather_gen_data` dedups; this path does not. **Fix:** dedup by
 id in `build_index`. Related to ESF-009 (id-set diff).
 
-## [ESF-025] test · M · 🧪 · open — coverage gaps for load-bearing failure paths
+## [ESF-025] test · M · 🧪 · ✅ **RESOLVED (2026-05-29)** — coverage gaps for load-bearing failure paths
+
+> **✅ Resolved 2026-05-29 (subsumed).** Every fix this session shipped red→green
+> with a regression test for exactly the failure paths this ticket named:
+> non-flam3 200 body (ESF-018), non-UTF-8 flam3 in chunk build (ESF-021),
+> corrupt-vs-animation classification (ESF-022), unseal clobber-on-resume
+> (ESF-023), hybrid sealed+loose dedup (ESF-024), entity-bomb XML (ESF-026).
+> The named gaps are closed.
+
 
 No tests for: a 200 non-flame body poisoning the corpus (ESF-018), non-UTF-8
 flam3 in `build_chunks_tar` (ESF-021), corrupt-vs-animation classification
@@ -180,7 +188,13 @@ deps float on `>=` lower bounds, so a fresh install resolves to whatever is
 newest on PyPI with no hash verification. For a CLI that ingests untrusted data
 and publishes public artifacts, commit the lockfile.
 
-## [ESF-029] security · XS · 🔒 · open — SRI hash for Chart.js in the stats page
+## [ESF-029] security · XS · 🔒 · ⏸ **DEFERRED (2026-05-29)** — SRI hash for Chart.js in the stats page
+
+> **⏸ Deferred 2026-05-29.** `scripts/build_stats_page.py` is untracked and the
+> generated page ships nowhere, so a missing SRI hash has no live attack surface.
+> Pull forward — add `integrity=`/`crossorigin` to the CDN `<script>` — the
+> moment the stats page is committed or published.
+
 
 `scripts/build_stats_page.py:146` loads `chart.js@4.4.1` from jsDelivr with no
 `integrity=`/`crossorigin`. Low priority — the page is currently an untracked
@@ -291,7 +305,13 @@ a small pure-Python CLI but cheap to add.
 FF-merge-after-verify workflow is not enforced. **Fix (after ESF-030):** ruleset
 requiring the CI status check + linear history.
 
-## [ESF-037] infra · 🪶 · open — packaging metadata polish (only if PyPI is ever wanted)
+## [ESF-037] infra · 🪶 · ⏸ **DEFERRED (2026-05-29)** — packaging metadata polish (only if PyPI is ever wanted)
+
+> **⏸ Deferred 2026-05-29.** Not publishing to PyPI (a legitimate choice for
+> corpus tooling). If that ever changes: fill `classifiers` / `keywords` /
+> `[project.urls]`, and publish via OIDC trusted publishing (not a long-lived
+> token). README should then state the install path explicitly.
+
 
 Not on PyPI (a legitimate choice for corpus tooling). If publishing is ever
 desired: fill `classifiers`, `keywords`, `[project.urls]`, and use OIDC trusted
